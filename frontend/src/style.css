@@ -1,0 +1,331 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  background: #f4f1ea;
+  color: #111827;
+}
+
+button {
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  min-height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(20, 184, 166, 0.16),
+      transparent 32rem
+    ),
+    #f4f1ea;
+}
+
+.mapShell {
+  position: absolute;
+  inset: 0;
+}
+
+.map {
+  width: 100%;
+  height: 100%;
+}
+
+.panel {
+  position: fixed;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 999;
+  padding: 0.8rem;
+  border: 1px solid rgba(17, 24, 39, 0.1);
+  border-radius: 26px;
+  background: rgba(255, 252, 246, 0.94);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 80px rgba(17, 24, 39, 0.24);
+}
+
+.handle {
+  width: 42px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.2);
+  margin: 0 auto 0.45rem;
+}
+
+.logoBox {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 118px;
+  margin: 0 0 0.6rem;
+  overflow: hidden;
+  border-radius: 22px;
+}
+
+.logoBox::after {
+  content: "";
+  position: absolute;
+  left: 20%;
+  right: 20%;
+  bottom: 12px;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(15, 118, 110, 0.16);
+  filter: blur(8px);
+  transform: scaleX(0.85);
+}
+
+.appLogo {
+  position: relative;
+  z-index: 2;
+  width: min(335px, 88vw);
+  height: auto;
+  max-height: 110px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(0 10px 18px rgba(15, 118, 110, 0.2));
+  transform-origin: 52% 72%;
+}
+
+.logoBox.loading .appLogo {
+  animation: logoIdleRev 0.42s linear infinite;
+}
+
+.logoBox.launching .appLogo {
+  animation: logoSpeedAway 1.18s cubic-bezier(0.2, 0.8, 0.22, 1) both;
+}
+
+.logoBox.launching::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: 8%;
+  top: 44%;
+  width: 58%;
+  height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    rgba(15, 118, 110, 0),
+    rgba(15, 118, 110, 0.22),
+    rgba(15, 118, 110, 0)
+  );
+  filter: blur(6px);
+  animation: speedStreak 1.18s ease-out both;
+}
+
+@keyframes logoIdleRev {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+
+  25% {
+    transform: translate(1px, -1px) rotate(-0.4deg) scale(1.006);
+  }
+
+  50% {
+    transform: translate(-1px, 1px) rotate(0.4deg) scale(1.01);
+  }
+
+  75% {
+    transform: translate(1px, 1px) rotate(-0.25deg) scale(1.006);
+  }
+
+  100% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+  }
+}
+
+@keyframes logoSpeedAway {
+  0% {
+    transform: translateX(0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+
+  12% {
+    transform: translateX(-5px) rotate(-1deg) scale(1.02);
+  }
+
+  24% {
+    transform: translateX(6px) rotate(1deg) scale(1.035);
+  }
+
+  36% {
+    transform: translateX(-3px) rotate(-0.6deg) scale(1.04);
+  }
+
+  58% {
+    transform: translateX(18px) rotate(1deg) scale(1.02);
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(120vw) rotate(5deg) scale(0.86);
+    opacity: 0;
+  }
+}
+
+@keyframes speedStreak {
+  0% {
+    transform: translateX(-20%) scaleX(0.2);
+    opacity: 0;
+  }
+
+  30% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(110%) scaleX(1.2);
+    opacity: 0;
+  }
+}
+
+.statusCard {
+  position: relative;
+  overflow: hidden;
+  padding: 0.95rem;
+  border-radius: 22px;
+  background: #111827;
+  color: white;
+}
+
+.statusContent {
+  position: relative;
+  z-index: 2;
+}
+
+.statusCard.waiting::before,
+.statusCard.waiting::after {
+  content: "";
+  position: absolute;
+  inset: 0.65rem;
+  border: 2px solid rgba(45, 212, 191, 0.38);
+  border-radius: 20px;
+  animation: radarPulse 1.65s infinite ease-out;
+}
+
+.statusCard.waiting::after {
+  animation-delay: 0.82s;
+}
+
+@keyframes radarPulse {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.75;
+  }
+
+  100% {
+    transform: scale(1.18);
+    opacity: 0;
+  }
+}
+
+.label {
+  margin: 0 0 0.25rem;
+  font-size: 0.76rem;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.label.danger {
+  color: #fecaca;
+}
+
+.mainText {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.etaNumber {
+  font-size: 3.85rem;
+  line-height: 0.95;
+  font-weight: 950;
+  letter-spacing: -0.09em;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+}
+
+.stats div {
+  padding: 0.7rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.stats span {
+  display: block;
+  margin-bottom: 0.18rem;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.73rem;
+  font-weight: 800;
+}
+
+.stats strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.leaveSoon,
+.leaveNow {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: 18px;
+  font-size: 1.08rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.leaveSoon {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.leaveNow {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.leaflet-control-attribution {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logoBox.loading .appLogo,
+  .logoBox.launching .appLogo,
+  .logoBox.launching::before,
+  .statusCard.waiting::before,
+  .statusCard.waiting::after {
+    animation: none;
+  }
+}
