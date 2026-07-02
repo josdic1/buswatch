@@ -144,9 +144,10 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map(
-      (point) => [point.lat, point.lng] as [number, number],
-    );
+    const bounds = points.map((point) => [
+      point.lat,
+      point.lng,
+    ] as [number, number]);
 
     map.fitBounds(bounds, {
       paddingTopLeft: [36, 36],
@@ -175,7 +176,9 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes -
+      userEta.durationMinutes -
+      EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
@@ -194,9 +197,7 @@ export default function App() {
         },
         () => {
           reject(
-            new Error(
-              "Location blocked. Allow location and tap the bus again.",
-            ),
+            new Error("Location blocked. Allow location and tap the bus again."),
           );
         },
         {
@@ -215,6 +216,15 @@ export default function App() {
     } catch {
       setError("Could not load the Deeny-to-JCC route.");
     }
+  }
+
+  function resetBus() {
+    setBusPoint(null);
+    setBusEta(null);
+    setUserEta(null);
+    setError("");
+    setLoading(false);
+    setLogoLaunching(false);
   }
 
   async function handleTapBus(point: Point) {
@@ -399,6 +409,10 @@ export default function App() {
 
       <section className="panel">
         <div className="handle" />
+
+        <button className="resetButton" onClick={resetBus}>
+          Reset
+        </button>
 
         <AppLogo loading={loading} launching={logoLaunching} />
 
