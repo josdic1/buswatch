@@ -269,17 +269,18 @@ function FitEverythingInView({
 
 function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
   const roadFade: Record<string, number> = {
-    i80: 0.95,
-    rt10: 0.78,
-    mtpleasant: 0.62,
-    shrewsbury: 0.46,
-    northfield: 0.32,
+    i80: 0.9,
+    rt10: 0.62,
+    mtpleasant: 0.42,
+    shrewsbury: 0.25,
+    northfield: 0.12,
   };
 
   const roadOpacity = roadFade[checkpoint.id] ?? 1;
+  const isRoad = checkpoint.kind === "road";
 
   const radius =
-    checkpoint.kind === "camp" ? 10 : checkpoint.kind === "jcc" ? 11 : 6;
+    checkpoint.kind === "camp" ? 10 : checkpoint.kind === "jcc" ? 11 : 5;
 
   const pathOptions =
     checkpoint.kind === "camp"
@@ -301,15 +302,16 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
         : {
             color: "#0f766e",
             fillColor: "#ccfbf1",
-            fillOpacity: 0.72 * roadOpacity,
-            opacity: 0.55 * roadOpacity,
+            fillOpacity: 0.55 * roadOpacity,
+            opacity: 0.45 * roadOpacity,
             weight: 2,
           };
 
-  const tooltipClassName =
-    checkpoint.kind === "road"
-      ? `checkpointTooltip roadTooltip roadTooltip-${checkpoint.id}`
-      : "checkpointTooltip";
+  const tooltipClassName = isRoad
+    ? `checkpointTooltip roadTooltip roadTooltip-${checkpoint.id}`
+    : "checkpointTooltip";
+
+  const tooltipOpacity = isRoad ? roadOpacity : 1;
 
   return (
     <CircleMarker
@@ -321,6 +323,7 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
         permanent
         direction="top"
         offset={[0, -10]}
+        opacity={tooltipOpacity}
         className={tooltipClassName}
       >
         {checkpoint.label}

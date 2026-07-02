@@ -389,30 +389,32 @@ button {
 }
 
 .roadTooltip {
-  transform: scale(0.94);
-  color: rgba(17, 24, 39, 0.78);
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 6px 14px rgba(17, 24, 39, 0.08);
+  transform: scale(0.86);
+  color: rgba(17, 24, 39, 0.72);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 4px 10px rgba(17, 24, 39, 0.06);
+  font-size: 0.62rem;
+  padding: 0.24rem 0.42rem;
 }
 
-.roadTooltip-i80 {
-  opacity: 0.95;
+.leaflet-tooltip.roadTooltip-i80 {
+  opacity: 0.9 !important;
 }
 
-.roadTooltip-rt10 {
-  opacity: 0.78;
+.leaflet-tooltip.roadTooltip-rt10 {
+  opacity: 0.62 !important;
 }
 
-.roadTooltip-mtpleasant {
-  opacity: 0.62;
+.leaflet-tooltip.roadTooltip-mtpleasant {
+  opacity: 0.42 !important;
 }
 
-.roadTooltip-shrewsbury {
-  opacity: 0.46;
+.leaflet-tooltip.roadTooltip-shrewsbury {
+  opacity: 0.25 !important;
 }
 
-.roadTooltip-northfield {
-  opacity: 0.32;
+.leaflet-tooltip.roadTooltip-northfield {
+  opacity: 0.12 !important;
 }
 
 .busTooltip {
