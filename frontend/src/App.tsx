@@ -3,7 +3,6 @@ import {
   TileLayer,
   CircleMarker,
   Polyline,
-  Circle,
   Tooltip,
   useMap,
   useMapEvents,
@@ -72,7 +71,7 @@ const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
     point: { lat: 40.8461, lng: -74.4328 },
     kind: "road",
     visible: true,
-    labelOpacity: 0.44,
+    labelOpacity: 0.48,
   },
   {
     id: "mtpleasant",
@@ -93,8 +92,7 @@ const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
     label: "Northfield",
     point: { lat: 40.7754, lng: -74.2989 },
     kind: "road",
-    visible: true,
-    labelOpacity: 0.18,
+    visible: false,
   },
   {
     id: "jcc",
@@ -109,8 +107,6 @@ const DEFAULT_CENTER: LatLngExpression = [
   SOUTH_ORANGE_POINT.lat,
   SOUTH_ORANGE_POINT.lng,
 ];
-
-const FIFTY_MILE_RADIUS_METERS = 50 * 1609.344;
 
 const NORTH_JERSEY_BOUNDS: LatLngBoundsExpression = [
   [40.02, -75.22],
@@ -286,12 +282,12 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
   const labelOpacity = checkpoint.labelOpacity ?? 1;
 
   const radius =
-    checkpoint.kind === "camp" ? 9 : checkpoint.kind === "jcc" ? 10 : 3;
+    checkpoint.kind === "camp" ? 9 : checkpoint.kind === "jcc" ? 10 : 4;
 
   const pathOptions =
     checkpoint.kind === "camp"
       ? {
-          color: "#7c2d12",
+          color: "#f97316",
           fillColor: "#fed7aa",
           fillOpacity: 1,
           opacity: 1,
@@ -299,17 +295,17 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
         }
       : checkpoint.kind === "jcc"
         ? {
-            color: "#111827",
-            fillColor: "#ffffff",
+            color: "#f8fafc",
+            fillColor: "#0f172a",
             fillOpacity: 1,
             opacity: 1,
             weight: 4,
           }
         : {
-            color: "#0f766e",
-            fillColor: "#ccfbf1",
-            fillOpacity: 0.35 * labelOpacity,
-            opacity: 0.35 * labelOpacity,
+            color: "#5eead4",
+            fillColor: "#5eead4",
+            fillOpacity: 0.6 * labelOpacity,
+            opacity: 0.5 * labelOpacity,
             weight: 1,
           };
 
@@ -326,7 +322,7 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
       <Tooltip
         permanent
         direction="top"
-        offset={[0, isRoad ? -5 : -10]}
+        offset={[0, isRoad ? -6 : -10]}
         opacity={isRoad ? labelOpacity : 1}
         className={tooltipClassName}
       >
@@ -522,8 +518,8 @@ export default function App() {
           bounceAtZoomLimits={false}
         >
           <TileLayer
-            attribution="&copy; OpenStreetMap contributors"
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap contributors &copy; CARTO"
+            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
           />
 
           <TapBusHandler enabled={!routeLoading} onTapBus={handleTapBus} />
@@ -535,26 +531,14 @@ export default function App() {
             userPoint={userPoint}
           />
 
-          <Circle
-            center={[SOUTH_ORANGE_POINT.lat, SOUTH_ORANGE_POINT.lng]}
-            radius={FIFTY_MILE_RADIUS_METERS}
-            pathOptions={{
-              color: "#0f766e",
-              fillColor: "#0f766e",
-              fillOpacity: 0.02,
-              weight: 1,
-              opacity: 0.16,
-            }}
-          />
-
           {plannedRoute.length > 0 && (
             <>
               <Polyline
                 positions={plannedRoute.map((point) => [point.lat, point.lng])}
                 pathOptions={{
-                  color: "#0f766e",
-                  weight: 11,
-                  opacity: 0.1,
+                  color: "#020617",
+                  weight: 15,
+                  opacity: 0.72,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -563,9 +547,9 @@ export default function App() {
               <Polyline
                 positions={plannedRoute.map((point) => [point.lat, point.lng])}
                 pathOptions={{
-                  color: "#0f766e",
+                  color: "#5eead4",
                   weight: 5,
-                  opacity: 0.38,
+                  opacity: 0.86,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -577,9 +561,9 @@ export default function App() {
             <Polyline
               positions={remainingRoute.map((point) => [point.lat, point.lng])}
               pathOptions={{
-                color: "#14b8a6",
+                color: "#22c55e",
                 weight: 8,
-                opacity: 0.92,
+                opacity: 1,
                 lineCap: "round",
                 lineJoin: "round",
               }}
@@ -595,8 +579,8 @@ export default function App() {
               center={[userPoint.lat, userPoint.lng]}
               radius={11}
               pathOptions={{
-                color: "#1d4ed8",
-                fillColor: "#93c5fd",
+                color: "#ffffff",
+                fillColor: "#3b82f6",
                 fillOpacity: 1,
                 weight: 4,
               }}
@@ -617,7 +601,7 @@ export default function App() {
               center={[busPoint.lat, busPoint.lng]}
               radius={13}
               pathOptions={{
-                color: "#0f766e",
+                color: "#ffffff",
                 fillColor: "#14b8a6",
                 fillOpacity: 1,
                 weight: 5,
