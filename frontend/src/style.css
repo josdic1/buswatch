@@ -90,11 +90,6 @@ button {
   right: 0.7rem;
   bottom: calc(0.7rem + env(safe-area-inset-bottom));
   z-index: 1000;
-  max-height: 48dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
   pointer-events: auto;
   padding: 0.65rem;
   border: 1px solid rgba(15, 23, 42, 0.1);

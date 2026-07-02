@@ -440,37 +440,62 @@ export default function App() {
 
     ctx.resume();
 
-    const gain = ctx.createGain();
-    gain.gain.value = 0.5;
-    gain.connect(ctx.destination);
+    const CHIME_COUNT = 4; // how many times it dings
+    const CHIME_GAP_MS = 1600; // pause between dings
 
-    const osc = ctx.createOscillator();
-    osc.type = "square";
-    osc.frequency.value = 880;
-    osc.connect(gain);
-    osc.start();
+    let stopped = false;
 
-    // Two-tone siren: flip pitch every 350ms
-    let high = true;
-    const pitchTimer = window.setInterval(() => {
-      high = !high;
-      osc.frequency.setValueAtTime(high ? 880 : 620, ctx.currentTime);
-    }, 350);
+    function playChime() {
+      if (stopped || !ctx) return;
 
-    // Re-fire vibration every second so it keeps buzzing
-    const vibrateTimer = window.setInterval(() => {
-      navigator.vibrate?.([350, 120, 350]);
-    }, 1000);
+      const now = ctx.currentTime;
 
-    navigator.vibrate?.([350, 120, 350]);
+      // Two soft notes: E5 then C5, like a doorbell
+      const notes = [
+        { freq: 659.25, start: 0 },
+        { freq: 523.25, start: 0.28 },
+      ];
+
+      notes.forEach((note) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+
+        osc.type = "sine";
+        osc.frequency.value = note.freq;
+
+        // Fade in fast, fade out slow = soft "ding" instead of a blast
+        gain.gain.setValueAtTime(0, now + note.start);
+        gain.gain.linearRampToValueAtTime(0.22, now + note.start + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + note.start + 0.9);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(now + note.start);
+        osc.stop(now + note.start + 1);
+      });
+    }
+
+    // One gentle buzz per chime, not a jackhammer
+    navigator.vibrate?.(200);
+    playChime();
+
+    let chimesPlayed = 1;
+    const chimeTimer = window.setInterval(() => {
+      if (chimesPlayed >= CHIME_COUNT) {
+        window.clearInterval(chimeTimer);
+        return;
+      }
+
+      chimesPlayed += 1;
+      navigator.vibrate?.(200);
+      playChime();
+    }, CHIME_GAP_MS);
 
     return () => {
-      window.clearInterval(pitchTimer);
-      window.clearInterval(vibrateTimer);
+      stopped = true;
+      window.clearInterval(chimeTimer);
       navigator.vibrate?.(0);
-      osc.stop();
-      osc.disconnect();
-      gain.disconnect();
     };
   }
 
@@ -983,33 +1008,33 @@ export default function App() {
                   )}
 
                 {alarmArmed && (
-                  <div className="countdownBox">
-                    <div className="countdownInfo">
-                      <span>Alarm in</span>
-                      <strong>{formatCountdown(secondsLeft)}</strong>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="countdownCancel"
-                      onPointerDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onTouchStart={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onMouseDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        cancelAlarm();
-                      }}
-                    >
-                      Cancel
-                    </button>
+                  <div className="alertCountdown">
+                    <span>Alarm in</span>
+                    <strong>{formatCountdown(secondsLeft)}</strong>
                   </div>
+                )}
+
+                {alarmArmed && (
+                  <button
+                    type="button"
+                    className="cancelAlertButton"
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onTouchStart={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      cancelAlarm();
+                    }}
+                  >
+                    Cancel
+                  </button>
                 )}
 
                 {alertStatus && <p className="alertStatus">{alertStatus}</p>}
