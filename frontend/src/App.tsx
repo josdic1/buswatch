@@ -1024,7 +1024,7 @@ export default function App() {
           <div className="alarmOverlayInner">
             <p className="alarmEmoji">🚌</p>
             <p className="alarmTitle">Leave now</p>
-            <p className="alarmSub">Deeny bus timing says it’s time to go.</p>
+            <p className="alarmSub">Tsadie bus timing says it’s time to go.</p>
 
             <button
               type="button"
