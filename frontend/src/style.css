@@ -46,13 +46,14 @@ button {
   user-select: none;
   -webkit-touch-callout: none;
   background:
-    radial-gradient(circle at top left, rgba(20, 184, 166, 0.14), transparent 32rem),
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.12), transparent 32rem),
     #f4f1ea;
 }
 
 .mapShell {
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 
 .mapShell,
@@ -82,21 +83,30 @@ button {
 
 .panel {
   position: fixed;
-  left: 0.75rem;
-  right: 0.75rem;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom));
-  z-index: 999;
-  max-height: 46dvh;
+  left: 0.7rem;
+  right: 0.7rem;
+  bottom: calc(0.7rem + env(safe-area-inset-bottom));
+  z-index: 1000;
+  max-height: 48dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
-  padding: 0.8rem;
+  padding: 0.65rem;
   border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 26px;
-  background: rgba(255, 252, 246, 0.94);
+  background: rgba(255, 252, 246, 0.96);
   backdrop-filter: blur(18px);
   box-shadow: 0 24px 80px rgba(17, 24, 39, 0.24);
+}
+
+.panelTop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  margin-bottom: 0.15rem;
 }
 
 .handle {
@@ -104,20 +114,19 @@ button {
   height: 5px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.2);
-  margin: 0 auto 0.45rem;
 }
 
 .resetButton {
   position: absolute;
-  top: 0.72rem;
-  right: 0.85rem;
-  z-index: 5;
+  right: 0;
+  top: 0;
+  z-index: 3;
   border: 0;
   border-radius: 999px;
-  padding: 0.5rem 0.72rem;
+  padding: 0.42rem 0.68rem;
   background: #111827;
   color: white;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 900;
   letter-spacing: -0.01em;
   box-shadow: 0 8px 20px rgba(17, 24, 39, 0.18);
@@ -133,21 +142,22 @@ button {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 118px;
-  margin: 0 0 0.6rem;
+  height: 86px;
+  margin: 0 0 0.45rem;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 20px;
+  pointer-events: none;
 }
 
 .logoBox::after {
   content: "";
   position: absolute;
-  left: 20%;
-  right: 20%;
-  bottom: 12px;
-  height: 10px;
+  left: 24%;
+  right: 24%;
+  bottom: 8px;
+  height: 9px;
   border-radius: 999px;
-  background: rgba(15, 118, 110, 0.16);
+  background: rgba(15, 118, 110, 0.12);
   filter: blur(8px);
   transform: scaleX(0.85);
 }
@@ -155,12 +165,12 @@ button {
 .appLogo {
   position: relative;
   z-index: 2;
-  width: min(335px, 88vw);
+  width: min(245px, 68vw);
   height: auto;
-  max-height: 110px;
+  max-height: 82px;
   object-fit: contain;
   display: block;
-  filter: drop-shadow(0 10px 18px rgba(15, 118, 110, 0.2));
+  filter: drop-shadow(0 8px 16px rgba(15, 118, 110, 0.16));
   transform-origin: 52% 72%;
 }
 
@@ -184,7 +194,7 @@ button {
   background: linear-gradient(
     90deg,
     rgba(15, 118, 110, 0),
-    rgba(15, 118, 110, 0.22),
+    rgba(15, 118, 110, 0.18),
     rgba(15, 118, 110, 0)
   );
   filter: blur(6px);
@@ -219,19 +229,15 @@ button {
     opacity: 1;
   }
 
-  12% {
+  14% {
     transform: translateX(-5px) rotate(-1deg) scale(1.02);
   }
 
-  24% {
+  28% {
     transform: translateX(6px) rotate(1deg) scale(1.035);
   }
 
-  36% {
-    transform: translateX(-3px) rotate(-0.6deg) scale(1.04);
-  }
-
-  58% {
+  48% {
     transform: translateX(18px) rotate(1deg) scale(1.02);
     opacity: 1;
   }
@@ -261,7 +267,7 @@ button {
 .statusCard {
   position: relative;
   overflow: hidden;
-  padding: 0.95rem;
+  padding: 0.9rem;
   border-radius: 22px;
   background: #111827;
   color: white;
@@ -278,7 +284,7 @@ button {
   content: "";
   position: absolute;
   inset: 0.65rem;
-  border: 2px solid rgba(45, 212, 191, 0.38);
+  border: 2px solid rgba(45, 212, 191, 0.32);
   border-radius: 20px;
   animation: radarPulse 1.65s infinite ease-out;
 }
@@ -290,7 +296,7 @@ button {
 @keyframes radarPulse {
   0% {
     transform: scale(0.86);
-    opacity: 0.75;
+    opacity: 0.65;
   }
 
   100% {
@@ -300,8 +306,8 @@ button {
 }
 
 .label {
-  margin: 0 0 0.25rem;
-  font-size: 0.76rem;
+  margin: 0 0 0.22rem;
+  font-size: 0.72rem;
   font-weight: 900;
   color: rgba(255, 255, 255, 0.62);
   text-transform: uppercase;
@@ -314,13 +320,13 @@ button {
 
 .mainText {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.98rem;
   font-weight: 850;
   letter-spacing: -0.02em;
 }
 
 .etaNumber {
-  font-size: 3.85rem;
+  font-size: 3.25rem;
   line-height: 0.95;
   font-weight: 950;
   letter-spacing: -0.09em;
@@ -330,11 +336,11 @@ button {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.55rem;
-  margin-top: 0.85rem;
+  margin-top: 0.72rem;
 }
 
 .stats div {
-  padding: 0.7rem;
+  padding: 0.68rem;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.08);
 }
@@ -343,21 +349,21 @@ button {
   display: block;
   margin-bottom: 0.18rem;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 0.73rem;
+  font-size: 0.7rem;
   font-weight: 800;
 }
 
 .stats strong {
   display: block;
-  font-size: 1rem;
+  font-size: 0.98rem;
 }
 
 .leaveSoon,
 .leaveNow {
-  margin-top: 0.75rem;
-  padding: 0.85rem 1rem;
+  margin-top: 0.72rem;
+  padding: 0.82rem 1rem;
   border-radius: 18px;
-  font-size: 1.08rem;
+  font-size: 1rem;
   font-weight: 950;
   text-align: center;
 }
@@ -373,15 +379,16 @@ button {
 }
 
 .checkpointTooltip {
-  background: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.92);
   border: 0;
   border-radius: 999px;
-  box-shadow: 0 8px 20px rgba(17, 24, 39, 0.12);
+  box-shadow: 0 6px 16px rgba(17, 24, 39, 0.1);
   color: #111827;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   font-weight: 900;
   letter-spacing: 0.01em;
-  padding: 0.32rem 0.52rem;
+  padding: 0.26rem 0.46rem;
+  pointer-events: none;
 }
 
 .checkpointTooltip::before {
@@ -389,32 +396,12 @@ button {
 }
 
 .roadTooltip {
-  transform: scale(0.86);
-  color: rgba(17, 24, 39, 0.72);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 4px 10px rgba(17, 24, 39, 0.06);
-  font-size: 0.62rem;
-  padding: 0.24rem 0.42rem;
-}
-
-.leaflet-tooltip.roadTooltip-i80 {
-  opacity: 0.9 !important;
-}
-
-.leaflet-tooltip.roadTooltip-rt10 {
-  opacity: 0.62 !important;
-}
-
-.leaflet-tooltip.roadTooltip-mtpleasant {
-  opacity: 0.42 !important;
-}
-
-.leaflet-tooltip.roadTooltip-shrewsbury {
-  opacity: 0.25 !important;
-}
-
-.leaflet-tooltip.roadTooltip-northfield {
-  opacity: 0.12 !important;
+  transform: scale(0.78);
+  color: rgba(17, 24, 39, 0.66);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 3px 8px rgba(17, 24, 39, 0.05);
+  font-size: 0.58rem;
+  padding: 0.2rem 0.34rem;
 }
 
 .busTooltip {
@@ -439,15 +426,20 @@ button {
   }
 
   .logoBox {
-    height: 92px;
+    height: 70px;
   }
 
   .appLogo {
-    max-height: 88px;
+    max-height: 68px;
+    width: min(210px, 62vw);
   }
 
   .etaNumber {
-    font-size: 3.1rem;
+    font-size: 2.9rem;
+  }
+
+  .statusCard {
+    padding: 0.78rem;
   }
 }
 

@@ -31,6 +31,8 @@ type RouteCheckpoint = {
   label: string;
   point: Point;
   kind: "camp" | "road" | "jcc";
+  visible?: boolean;
+  labelOpacity?: number;
 };
 
 const SOUTH_ORANGE_POINT: Point = {
@@ -54,42 +56,52 @@ const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
     label: "Camp",
     point: CAMP_POINT,
     kind: "camp",
+    visible: true,
   },
   {
     id: "i80",
     label: "I-80 E",
     point: { lat: 40.8762, lng: -74.6805 },
     kind: "road",
+    visible: true,
+    labelOpacity: 0.78,
   },
   {
     id: "rt10",
     label: "Rt 10",
     point: { lat: 40.8461, lng: -74.4328 },
     kind: "road",
+    visible: true,
+    labelOpacity: 0.44,
   },
   {
     id: "mtpleasant",
     label: "Mt Pleasant",
     point: { lat: 40.8038, lng: -74.3498 },
     kind: "road",
+    visible: false,
   },
   {
     id: "shrewsbury",
     label: "Shrewsbury",
     point: { lat: 40.7874, lng: -74.3208 },
     kind: "road",
+    visible: false,
   },
   {
     id: "northfield",
     label: "Northfield",
     point: { lat: 40.7754, lng: -74.2989 },
     kind: "road",
+    visible: true,
+    labelOpacity: 0.18,
   },
   {
     id: "jcc",
     label: "JCC",
     point: JCC_POINT,
     kind: "jcc",
+    visible: true,
   },
 ];
 
@@ -257,8 +269,8 @@ function FitEverythingInView({
     ] as [number, number]);
 
     map.fitBounds(bounds, {
-      paddingTopLeft: [36, 36],
-      paddingBottomRight: [36, 260],
+      paddingTopLeft: [34, 34],
+      paddingBottomRight: [34, 330],
       maxZoom: 10,
       animate: true,
     });
@@ -268,19 +280,13 @@ function FitEverythingInView({
 }
 
 function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
-  const roadFade: Record<string, number> = {
-    i80: 0.9,
-    rt10: 0.62,
-    mtpleasant: 0.42,
-    shrewsbury: 0.25,
-    northfield: 0.12,
-  };
+  if (!checkpoint.visible) return null;
 
-  const roadOpacity = roadFade[checkpoint.id] ?? 1;
   const isRoad = checkpoint.kind === "road";
+  const labelOpacity = checkpoint.labelOpacity ?? 1;
 
   const radius =
-    checkpoint.kind === "camp" ? 10 : checkpoint.kind === "jcc" ? 11 : 5;
+    checkpoint.kind === "camp" ? 9 : checkpoint.kind === "jcc" ? 10 : 3;
 
   const pathOptions =
     checkpoint.kind === "camp"
@@ -302,16 +308,14 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
         : {
             color: "#0f766e",
             fillColor: "#ccfbf1",
-            fillOpacity: 0.55 * roadOpacity,
-            opacity: 0.45 * roadOpacity,
-            weight: 2,
+            fillOpacity: 0.35 * labelOpacity,
+            opacity: 0.35 * labelOpacity,
+            weight: 1,
           };
 
   const tooltipClassName = isRoad
-    ? `checkpointTooltip roadTooltip roadTooltip-${checkpoint.id}`
+    ? "checkpointTooltip roadTooltip"
     : "checkpointTooltip";
-
-  const tooltipOpacity = isRoad ? roadOpacity : 1;
 
   return (
     <CircleMarker
@@ -322,8 +326,8 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
       <Tooltip
         permanent
         direction="top"
-        offset={[0, -10]}
-        opacity={tooltipOpacity}
+        offset={[0, isRoad ? -5 : -10]}
+        opacity={isRoad ? labelOpacity : 1}
         className={tooltipClassName}
       >
         {checkpoint.label}
@@ -518,9 +522,9 @@ export default function App() {
             pathOptions={{
               color: "#0f766e",
               fillColor: "#0f766e",
-              fillOpacity: 0.03,
-              weight: 2,
-              opacity: 0.25,
+              fillOpacity: 0.02,
+              weight: 1,
+              opacity: 0.16,
             }}
           />
 
@@ -531,7 +535,7 @@ export default function App() {
                 pathOptions={{
                   color: "#0f766e",
                   weight: 11,
-                  opacity: 0.12,
+                  opacity: 0.1,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -542,7 +546,7 @@ export default function App() {
                 pathOptions={{
                   color: "#0f766e",
                   weight: 5,
-                  opacity: 0.46,
+                  opacity: 0.38,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -556,7 +560,7 @@ export default function App() {
               pathOptions={{
                 color: "#14b8a6",
                 weight: 8,
-                opacity: 0.96,
+                opacity: 0.92,
                 lineCap: "round",
                 lineJoin: "round",
               }}
@@ -592,7 +596,7 @@ export default function App() {
           {busPoint && (
             <CircleMarker
               center={[busPoint.lat, busPoint.lng]}
-              radius={14}
+              radius={13}
               pathOptions={{
                 color: "#0f766e",
                 fillColor: "#14b8a6",
@@ -614,11 +618,13 @@ export default function App() {
       </section>
 
       <section className="panel">
-        <div className="handle" />
+        <div className="panelTop">
+          <div className="handle" />
 
-        <button className="resetButton" onClick={resetBus}>
-          Reset
-        </button>
+          <button className="resetButton" onClick={resetBus}>
+            Reset
+          </button>
+        </div>
 
         <AppLogo loading={loading} launching={logoLaunching} />
 
