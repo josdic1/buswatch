@@ -243,19 +243,26 @@ function TapBusHandler({
 }
 
 function FitEverythingInView({
+  fitVersion,
   plannedRoute,
   remainingRoute,
   busPoint,
   userPoint,
 }: {
+  fitVersion: number;
   plannedRoute: Point[];
   remainingRoute: Point[];
   busPoint: Point | null;
   userPoint: Point | null;
 }) {
   const map = useMap();
+  const lastFitVersionRef = useRef(-1);
 
   useEffect(() => {
+    // Only refit when explicitly asked. Never fight the user's fingers.
+    if (fitVersion === lastFitVersionRef.current) return;
+    lastFitVersionRef.current = fitVersion;
+
     const points: Point[] = [CAMP_POINT, JCC_POINT];
 
     if (plannedRoute.length > 0) {
@@ -274,10 +281,9 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map((point) => [
-      point.lat,
-      point.lng,
-    ] as [number, number]);
+    const bounds = points.map(
+      (point) => [point.lat, point.lng] as [number, number],
+    );
 
     map.fitBounds(bounds, {
       paddingTopLeft: [34, 34],
@@ -285,7 +291,7 @@ function FitEverythingInView({
       maxZoom: 10,
       animate: true,
     });
-  }, [plannedRoute, remainingRoute, busPoint, userPoint, map]);
+  }, [fitVersion, plannedRoute, remainingRoute, busPoint, userPoint, map]);
 
   return null;
 }
@@ -366,6 +372,7 @@ export default function App() {
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
   );
+  const [fitVersion, setFitVersion] = useState(0);
 
   const remainingRoute = useMemo(() => {
     if (
@@ -383,11 +390,13 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes -
-      userEta.durationMinutes -
-      EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
+
+  function refitMap() {
+    setFitVersion((version) => version + 1);
+  }
 
   function clearLeaveAlert() {
     if (leaveAlertTimerRef.current !== null) {
@@ -471,7 +480,9 @@ export default function App() {
         },
         () => {
           reject(
-            new Error("Location blocked. Allow location and tap the route again."),
+            new Error(
+              "Location blocked. Allow location and tap the route again.",
+            ),
           );
         },
         {
@@ -493,6 +504,7 @@ export default function App() {
 
       setPlannedRoute(route);
       setError("");
+      refitMap();
     } catch {
       setError("Could not load the Deeny route.");
     } finally {
@@ -511,6 +523,7 @@ export default function App() {
     setError("");
     setLoading(false);
     setLogoLaunching(false);
+    refitMap();
   }
 
   async function handleTapBus(clickedPoint: Point) {
@@ -563,6 +576,7 @@ export default function App() {
 
       setBusEta(nextBusEta);
       setUserEta(nextUserEta);
+      refitMap();
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
 
@@ -593,21 +607,15 @@ export default function App() {
           minZoom={8}
           maxZoom={17}
           maxBounds={NORTH_JERSEY_BOUNDS}
-          maxBoundsViscosity={0.85}
+          maxBoundsViscosity={0.4}
           zoomControl={false}
           className="map"
-          dragging={true}
-          touchZoom="center"
-          doubleClickZoom={true}
-          scrollWheelZoom={false}
+          touchZoom={true}
+          scrollWheelZoom={true}
           boxZoom={false}
           keyboard={false}
-          inertia={true}
-          inertiaDeceleration={2800}
-          inertiaMaxSpeed={900}
           zoomSnap={0.25}
           zoomDelta={0.5}
-          preferCanvas={true}
           bounceAtZoomLimits={false}
         >
           <TileLayer
@@ -618,6 +626,7 @@ export default function App() {
           <TapBusHandler enabled={!routeLoading} onTapBus={handleTapBus} />
 
           <FitEverythingInView
+            fitVersion={fitVersion}
             plannedRoute={plannedRoute}
             remainingRoute={remainingRoute}
             busPoint={busPoint}
