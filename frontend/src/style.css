@@ -173,32 +173,6 @@ button {
   z-index: 2;
 }
 
-.statusCard.waiting::before,
-.statusCard.waiting::after {
-  content: "";
-  position: absolute;
-  inset: 0.65rem;
-  border: 2px solid rgba(45, 212, 191, 0.32);
-  border-radius: 20px;
-  animation: radarPulse 1.65s infinite ease-out;
-}
-
-.statusCard.waiting::after {
-  animation-delay: 0.82s;
-}
-
-@keyframes radarPulse {
-  0% {
-    transform: scale(0.86);
-    opacity: 0.65;
-  }
-
-  100% {
-    transform: scale(1.18);
-    opacity: 0;
-  }
-}
-
 .label {
   margin: 0 0 0.28rem;
   font-size: 0.7rem;
@@ -223,6 +197,7 @@ button {
   margin: 0.42rem 0 0;
   color: rgba(255, 255, 255, 0.62);
   font-size: 0.78rem;
+  line-height: 1.32;
   font-weight: 800;
 }
 
@@ -351,8 +326,49 @@ button {
 .cancelAlertButton:active,
 .alarmDismiss:active,
 .helpDone:active,
-.helpClose:active {
+.helpClose:active,
+.alertPrimary:active,
+.alertSecondary:active {
   transform: scale(0.98);
+}
+
+.miniNotice {
+  margin: 0.5rem 0 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.72rem;
+  line-height: 1.32;
+  font-weight: 800;
+  text-align: center;
+}
+
+.keepOpenBanner {
+  margin-top: 0.58rem;
+  padding: 0.72rem 0.82rem;
+  border-radius: 16px;
+  background: rgba(251, 191, 36, 0.16);
+  border: 1px solid rgba(251, 191, 36, 0.28);
+}
+
+.keepOpenBanner strong,
+.keepOpenBanner span {
+  display: block;
+  text-align: center;
+}
+
+.keepOpenBanner strong {
+  color: #fde68a;
+  font-size: 0.78rem;
+  font-weight: 1000;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.keepOpenBanner span {
+  margin-top: 0.16rem;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.82rem;
+  line-height: 1.3;
+  font-weight: 850;
 }
 
 .alertCountdown {
@@ -392,7 +408,8 @@ button {
   text-align: center;
 }
 
-.helpOverlay {
+.helpOverlay,
+.alertInfoOverlay {
   position: fixed;
   inset: 0;
   z-index: 4500;
@@ -405,7 +422,8 @@ button {
   pointer-events: auto;
 }
 
-.helpModal {
+.helpModal,
+.alertInfoModal {
   width: min(560px, 100%);
   max-height: 86dvh;
   overflow-y: auto;
@@ -415,6 +433,82 @@ button {
   background: #f8fafc;
   color: #111827;
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.34);
+}
+
+.alertInfoModal {
+  text-align: center;
+  padding: 1.1rem;
+}
+
+.alertInfoKicker {
+  margin: 0 0 0.2rem;
+  color: #0f766e;
+  font-size: 0.72rem;
+  font-weight: 1000;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.alertInfoModal h2 {
+  margin: 0;
+  font-size: 1.65rem;
+  line-height: 1;
+  font-weight: 1000;
+  letter-spacing: -0.06em;
+}
+
+.alertInfoText {
+  margin: 0.72rem auto 0;
+  max-width: 25rem;
+  color: #334155;
+  font-size: 1rem;
+  line-height: 1.35;
+  font-weight: 800;
+}
+
+.alertRules {
+  display: grid;
+  gap: 0.46rem;
+  margin-top: 0.9rem;
+}
+
+.alertRules div {
+  border-radius: 16px;
+  padding: 0.78rem 0.88rem;
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 0.96rem;
+  font-weight: 950;
+}
+
+.alertSoon {
+  margin: 0.82rem 0 0;
+  color: #0f766e;
+  font-size: 0.86rem;
+  font-weight: 950;
+}
+
+.alertPrimary,
+.alertSecondary {
+  width: 100%;
+  border: 0;
+  border-radius: 18px;
+  padding: 0.92rem 1rem;
+  font-size: 1rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+.alertPrimary {
+  margin-top: 0.9rem;
+  background: #111827;
+  color: white;
+}
+
+.alertSecondary {
+  margin-top: 0.52rem;
+  background: #e2e8f0;
+  color: #0f172a;
 }
 
 .helpHeader {
@@ -655,8 +749,6 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .statusCard.waiting::before,
-  .statusCard.waiting::after,
   .alarmOverlay {
     animation: none;
   }

@@ -366,6 +366,7 @@ export default function App() {
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [alarmFiring, setAlarmFiring] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [alertWarningOpen, setAlertWarningOpen] = useState(false);
 
   const remainingRoute = useMemo(() => {
     if (
@@ -508,7 +509,7 @@ export default function App() {
     if ("Notification" in window && Notification.permission === "granted") {
       try {
         new Notification("Leave now", {
-          body: "Deeny bus timing says it’s time to go.",
+          body: "Tsadie says it’s time to go.",
         });
       } catch {
         // Overlay and sound still handle the alarm.
@@ -524,6 +525,7 @@ export default function App() {
     setAlarmTargetMs(null);
     setSecondsLeft(null);
     setAlertStatus("");
+    setAlertWarningOpen(false);
     releaseWakeLock();
   }
 
@@ -534,6 +536,7 @@ export default function App() {
   function setLeaveAlarm() {
     if (leaveInMinutes === null) return;
 
+    setAlertWarningOpen(false);
     unlockAudio();
 
     if ("Notification" in window && Notification.permission === "default") {
@@ -553,7 +556,7 @@ export default function App() {
 
     setAlarmTargetMs(targetMs);
     setSecondsLeft(safeLeaveInMinutes * 60);
-    setAlertStatus("Keep the app open — screen will stay awake.");
+    setAlertStatus("Alarm active. Keep this screen open.");
   }
 
   async function getUserLocation(): Promise<Point> {
@@ -721,11 +724,12 @@ export default function App() {
   }, [alarmTargetMs]);
 
   useEffect(() => {
-    if (!helpOpen) return;
+    if (!helpOpen && !alertWarningOpen) return;
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setHelpOpen(false);
+        setAlertWarningOpen(false);
       }
     };
 
@@ -734,7 +738,7 @@ export default function App() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  }, [helpOpen]);
+  }, [helpOpen, alertWarningOpen]);
 
   return (
     <main className="app">
@@ -908,7 +912,7 @@ export default function App() {
           </button>
         </div>
 
-        <div className={busPoint ? "statusCard" : "statusCard waiting"}>
+        <div className="statusCard">
           <div className="statusContent">
             {error && (
               <>
@@ -952,7 +956,8 @@ export default function App() {
                   Tap where the bus is on the highlighted route.
                 </p>
                 <p className="helperText">
-                  Need location or Home Screen help? Tap the ? button.
+                  In-app alerts require this screen to stay open. Push
+                  notifications coming soon.
                 </p>
               </>
             )}
@@ -999,27 +1004,41 @@ export default function App() {
                   leaveInMinutes > 0 &&
                   !alarmArmed &&
                   !alarmFiring && (
-                    <button
-                      type="button"
-                      className="notifyButton"
-                      onPointerDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onTouchStart={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onMouseDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        setLeaveAlarm();
-                      }}
-                    >
-                      Alert me when to leave
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        className="notifyButton"
+                        onPointerDown={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onTouchStart={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onMouseDown={(event) => {
+                          event.stopPropagation();
+                        }}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setAlertWarningOpen(true);
+                        }}
+                      >
+                        Keep app open + alert me
+                      </button>
+
+                      <p className="miniNotice">
+                        Push notifications coming soon. For now, the alert only
+                        works while Tsadie stays open.
+                      </p>
+                    </>
                   )}
+
+                {alarmArmed && (
+                  <div className="keepOpenBanner">
+                    <strong>Alarm active</strong>
+                    <span>Keep this screen open and do not lock the phone.</span>
+                  </div>
+                )}
 
                 {alarmArmed && (
                   <div className="alertCountdown">
@@ -1057,6 +1076,53 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      {alertWarningOpen && (
+        <div
+          className="alertInfoOverlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="alert-info-title"
+        >
+          <div className="alertInfoModal">
+            <p className="alertInfoKicker">Important</p>
+            <h2 id="alert-info-title">Keep Tsadie open</h2>
+
+            <p className="alertInfoText">
+              This in-app alert only works while Tsadie stays open on this
+              screen.
+            </p>
+
+            <div className="alertRules">
+              <div>Do not lock the phone.</div>
+              <div>Do not close Tsadie.</div>
+              <div>Do not switch to another app.</div>
+            </div>
+
+            <p className="alertSoon">Push notifications coming soon.</p>
+
+            <button
+              type="button"
+              className="alertPrimary"
+              onClick={() => {
+                setLeaveAlarm();
+              }}
+            >
+              I understand — set alert
+            </button>
+
+            <button
+              type="button"
+              className="alertSecondary"
+              onClick={() => {
+                setAlertWarningOpen(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {helpOpen && (
         <div
@@ -1114,6 +1180,15 @@ export default function App() {
               </ol>
             </div>
 
+            <div className="helpSection">
+              <h3>About alerts</h3>
+              <ol>
+                <li>Current alerts work only while Tsadie stays open.</li>
+                <li>Do not lock the phone while the alert is counting down.</li>
+                <li>Push notifications are coming soon.</li>
+              </ol>
+            </div>
+
             <button
               type="button"
               className="helpDone"
@@ -1132,7 +1207,7 @@ export default function App() {
           <div className="alarmOverlayInner">
             <p className="alarmEmoji">🚌</p>
             <p className="alarmTitle">Leave now</p>
-            <p className="alarmSub">Deeny bus timing says it’s time to go.</p>
+            <p className="alarmSub">Tsadie says it’s time to go.</p>
 
             <button
               type="button"
