@@ -10,6 +10,14 @@ body,
   margin: 0;
 }
 
+html,
+body {
+  overflow: hidden;
+  overscroll-behavior: none;
+  position: fixed;
+  width: 100%;
+}
+
 body {
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
@@ -23,10 +31,20 @@ button {
   -webkit-tap-highlight-color: transparent;
 }
 
+#root {
+  height: 100dvh;
+  overflow: hidden;
+}
+
 .app {
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
   position: relative;
   overflow: hidden;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
   background:
     radial-gradient(circle at top left, rgba(20, 184, 166, 0.16), transparent 32rem),
     #f4f1ea;
@@ -37,17 +55,42 @@ button {
   inset: 0;
 }
 
-.map {
+.mapShell,
+.map,
+.leaflet-container {
   width: 100%;
-  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  touch-action: none;
+}
+
+.leaflet-container {
+  background: #f4f1ea;
+  outline: none;
+}
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-pane > svg {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .panel {
   position: fixed;
   left: 0.75rem;
   right: 0.75rem;
-  bottom: 0.75rem;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom));
   z-index: 999;
+  max-height: 46dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   padding: 0.8rem;
   border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 26px;
@@ -78,6 +121,7 @@ button {
   font-weight: 900;
   letter-spacing: -0.01em;
   box-shadow: 0 8px 20px rgba(17, 24, 39, 0.18);
+  touch-action: manipulation;
 }
 
 .resetButton:active {
@@ -221,6 +265,7 @@ button {
   border-radius: 22px;
   background: #111827;
   color: white;
+  touch-action: pan-y;
 }
 
 .statusContent {
@@ -329,6 +374,24 @@ button {
 
 .leaflet-control-attribution {
   display: none;
+}
+
+@media (max-height: 720px) {
+  .panel {
+    max-height: 52dvh;
+  }
+
+  .logoBox {
+    height: 92px;
+  }
+
+  .appLogo {
+    max-height: 88px;
+  }
+
+  .etaNumber {
+    font-size: 3.1rem;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

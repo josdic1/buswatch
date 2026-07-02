@@ -144,9 +144,10 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map(
-      (point) => [point.lat, point.lng] as [number, number],
-    );
+    const bounds = points.map((point) => [
+      point.lat,
+      point.lng,
+    ] as [number, number]);
 
     map.fitBounds(bounds, {
       paddingTopLeft: [36, 36],
@@ -175,7 +176,9 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes -
+      userEta.durationMinutes -
+      EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
@@ -194,9 +197,7 @@ export default function App() {
         },
         () => {
           reject(
-            new Error(
-              "Location blocked. Allow location and tap the bus again.",
-            ),
+            new Error("Location blocked. Allow location and tap the bus again."),
           );
         },
         {
@@ -275,9 +276,22 @@ export default function App() {
           minZoom={8}
           maxZoom={17}
           maxBounds={NORTH_JERSEY_BOUNDS}
-          maxBoundsViscosity={0.7}
+          maxBoundsViscosity={0.85}
           zoomControl={false}
           className="map"
+          dragging={true}
+          touchZoom="center"
+          doubleClickZoom={true}
+          scrollWheelZoom={false}
+          boxZoom={false}
+          keyboard={false}
+          inertia={true}
+          inertiaDeceleration={2800}
+          inertiaMaxSpeed={900}
+          zoomSnap={0.25}
+          zoomDelta={0.5}
+          preferCanvas={true}
+          bounceAtZoomLimits={false}
         >
           <TileLayer
             attribution="&copy; OpenStreetMap contributors"
