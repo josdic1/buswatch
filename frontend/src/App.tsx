@@ -4,6 +4,7 @@ import {
   CircleMarker,
   Polyline,
   Circle,
+  Tooltip,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -25,6 +26,13 @@ type EtaResult = {
   routePoints: Point[];
 };
 
+type RouteCheckpoint = {
+  id: string;
+  label: string;
+  point: Point;
+  kind: "camp" | "road" | "jcc";
+};
+
 const SOUTH_ORANGE_POINT: Point = {
   lat: 40.7489,
   lng: -74.2613,
@@ -39,6 +47,51 @@ const JCC_POINT: Point = {
   lat: 40.7697,
   lng: -74.2916,
 };
+
+const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
+  {
+    id: "camp",
+    label: "Camp",
+    point: CAMP_POINT,
+    kind: "camp",
+  },
+  {
+    id: "i80",
+    label: "I-80 E",
+    point: { lat: 40.8762, lng: -74.6805 },
+    kind: "road",
+  },
+  {
+    id: "rt10",
+    label: "Rt 10",
+    point: { lat: 40.8461, lng: -74.4328 },
+    kind: "road",
+  },
+  {
+    id: "mtpleasant",
+    label: "Mt Pleasant",
+    point: { lat: 40.8038, lng: -74.3498 },
+    kind: "road",
+  },
+  {
+    id: "shrewsbury",
+    label: "Shrewsbury",
+    point: { lat: 40.7874, lng: -74.3208 },
+    kind: "road",
+  },
+  {
+    id: "northfield",
+    label: "Northfield",
+    point: { lat: 40.7754, lng: -74.2989 },
+    kind: "road",
+  },
+  {
+    id: "jcc",
+    label: "JCC",
+    point: JCC_POINT,
+    kind: "jcc",
+  },
+];
 
 const DEFAULT_CENTER: LatLngExpression = [
   SOUTH_ORANGE_POINT.lat,
@@ -71,6 +124,58 @@ async function fetchEta(from: Point, to: Point): Promise<EtaResult> {
   return res.json();
 }
 
+async function fetchFixedRoute(points: Point[]): Promise<Point[]> {
+  const segments = await Promise.all(
+    points.slice(0, -1).map((startPoint, index) => {
+      const endPoint = points[index + 1];
+      return fetchEta(startPoint, endPoint);
+    }),
+  );
+
+  const merged: Point[] = [];
+
+  segments.forEach((segment, index) => {
+    if (segment.routePoints.length === 0) return;
+
+    if (index === 0) {
+      merged.push(...segment.routePoints);
+      return;
+    }
+
+    merged.push(...segment.routePoints.slice(1));
+  });
+
+  return merged;
+}
+
+function pointDistanceSquared(a: Point, b: Point) {
+  const latDiff = a.lat - b.lat;
+  const lngDiff = a.lng - b.lng;
+  return latDiff * latDiff + lngDiff * lngDiff;
+}
+
+function snapPointToRoute(target: Point, routePoints: Point[]) {
+  let nearestIndex = 0;
+  let nearestPoint = routePoints[0];
+  let nearestDistance = pointDistanceSquared(target, routePoints[0]);
+
+  for (let index = 1; index < routePoints.length; index += 1) {
+    const routePoint = routePoints[index];
+    const distance = pointDistanceSquared(target, routePoint);
+
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = index;
+      nearestPoint = routePoint;
+    }
+  }
+
+  return {
+    point: nearestPoint,
+    index: nearestIndex,
+  };
+}
+
 function AppLogo({
   loading,
   launching,
@@ -93,9 +198,17 @@ function AppLogo({
   );
 }
 
-function TapBusHandler({ onTapBus }: { onTapBus: (point: Point) => void }) {
+function TapBusHandler({
+  enabled,
+  onTapBus,
+}: {
+  enabled: boolean;
+  onTapBus: (point: Point) => void;
+}) {
   useMapEvents({
     click(event) {
+      if (!enabled) return;
+
       onTapBus({
         lat: event.latlng.lat,
         lng: event.latlng.lng,
@@ -108,14 +221,12 @@ function TapBusHandler({ onTapBus }: { onTapBus: (point: Point) => void }) {
 
 function FitEverythingInView({
   plannedRoute,
-  busEta,
-  userEta,
+  remainingRoute,
   busPoint,
   userPoint,
 }: {
   plannedRoute: Point[];
-  busEta: EtaResult | null;
-  userEta: EtaResult | null;
+  remainingRoute: Point[];
   busPoint: Point | null;
   userPoint: Point | null;
 }) {
@@ -128,12 +239,8 @@ function FitEverythingInView({
       points.push(...plannedRoute);
     }
 
-    if (busEta && busEta.routePoints.length > 0) {
-      points.push(...busEta.routePoints);
-    }
-
-    if (userEta && userEta.routePoints.length > 0) {
-      points.push(...userEta.routePoints);
+    if (remainingRoute.length > 0) {
+      points.push(...remainingRoute);
     }
 
     if (busPoint) {
@@ -144,20 +251,63 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map((point) => [
-      point.lat,
-      point.lng,
-    ] as [number, number]);
+    const bounds = points.map(
+      (point) => [point.lat, point.lng] as [number, number],
+    );
 
     map.fitBounds(bounds, {
       paddingTopLeft: [36, 36],
-      paddingBottomRight: [36, 255],
+      paddingBottomRight: [36, 260],
       maxZoom: 10,
       animate: true,
     });
-  }, [plannedRoute, busEta, userEta, busPoint, userPoint, map]);
+  }, [plannedRoute, remainingRoute, busPoint, userPoint, map]);
 
   return null;
+}
+
+function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
+  const radius =
+    checkpoint.kind === "camp" ? 10 : checkpoint.kind === "jcc" ? 11 : 7;
+
+  const pathOptions =
+    checkpoint.kind === "camp"
+      ? {
+          color: "#7c2d12",
+          fillColor: "#fed7aa",
+          fillOpacity: 1,
+          weight: 3,
+        }
+      : checkpoint.kind === "jcc"
+        ? {
+            color: "#111827",
+            fillColor: "#ffffff",
+            fillOpacity: 1,
+            weight: 4,
+          }
+        : {
+            color: "#0f766e",
+            fillColor: "#ccfbf1",
+            fillOpacity: 1,
+            weight: 3,
+          };
+
+  return (
+    <CircleMarker
+      center={[checkpoint.point.lat, checkpoint.point.lng]}
+      radius={radius}
+      pathOptions={pathOptions}
+    >
+      <Tooltip
+        permanent
+        direction="top"
+        offset={[0, -10]}
+        className="checkpointTooltip"
+      >
+        {checkpoint.label}
+      </Tooltip>
+    </CircleMarker>
+  );
 }
 
 export default function App() {
@@ -168,17 +318,31 @@ export default function App() {
   const [busEta, setBusEta] = useState<EtaResult | null>(null);
   const [userEta, setUserEta] = useState<EtaResult | null>(null);
 
+  const [routeLoading, setRouteLoading] = useState(true);
   const [loading, setLoading] = useState(false);
   const [logoLaunching, setLogoLaunching] = useState(false);
   const [error, setError] = useState("");
+  const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
+    null,
+  );
+
+  const remainingRoute = useMemo(() => {
+    if (
+      busRouteStartIndex === null ||
+      plannedRoute.length === 0 ||
+      busRouteStartIndex >= plannedRoute.length
+    ) {
+      return [];
+    }
+
+    return plannedRoute.slice(busRouteStartIndex);
+  }, [plannedRoute, busRouteStartIndex]);
 
   const leaveInMinutes = useMemo(() => {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes -
-      userEta.durationMinutes -
-      EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
@@ -197,7 +361,9 @@ export default function App() {
         },
         () => {
           reject(
-            new Error("Location blocked. Allow location and tap the bus again."),
+            new Error(
+              "Location blocked. Allow location and tap the route again.",
+            ),
           );
         },
         {
@@ -209,12 +375,20 @@ export default function App() {
     });
   }
 
-  async function loadPlannedRoute() {
+  async function loadFixedRoute() {
+    setRouteLoading(true);
+
     try {
-      const data = await fetchEta(CAMP_POINT, JCC_POINT);
-      setPlannedRoute(data.routePoints);
+      const route = await fetchFixedRoute(
+        ROUTE_CHECKPOINTS.map((checkpoint) => checkpoint.point),
+      );
+
+      setPlannedRoute(route);
+      setError("");
     } catch {
-      setError("Could not load the Deeny-to-JCC route.");
+      setError("Could not load the Deeny route.");
+    } finally {
+      setRouteLoading(false);
     }
   }
 
@@ -222,12 +396,18 @@ export default function App() {
     setBusPoint(null);
     setBusEta(null);
     setUserEta(null);
+    setBusRouteStartIndex(null);
     setError("");
     setLoading(false);
     setLogoLaunching(false);
   }
 
-  async function handleTapBus(point: Point) {
+  async function handleTapBus(clickedPoint: Point) {
+    if (plannedRoute.length === 0) {
+      setError("Route is still loading.");
+      return;
+    }
+
     setLogoLaunching(false);
 
     window.setTimeout(() => {
@@ -238,7 +418,10 @@ export default function App() {
       setLogoLaunching(false);
     }, 1250);
 
-    setBusPoint(point);
+    const snapped = snapPointToRoute(clickedPoint, plannedRoute);
+
+    setBusPoint(snapped.point);
+    setBusRouteStartIndex(snapped.index);
     setBusEta(null);
     setUserEta(null);
     setError("");
@@ -250,7 +433,7 @@ export default function App() {
       setUserPoint(currentUserPoint);
 
       const [nextBusEta, nextUserEta] = await Promise.all([
-        fetchEta(point, JCC_POINT),
+        fetchEta(snapped.point, JCC_POINT),
         fetchEta(currentUserPoint, JCC_POINT),
       ]);
 
@@ -264,7 +447,7 @@ export default function App() {
   }
 
   useEffect(() => {
-    loadPlannedRoute();
+    loadFixedRoute();
   }, []);
 
   return (
@@ -298,12 +481,11 @@ export default function App() {
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
-          <TapBusHandler onTapBus={handleTapBus} />
+          <TapBusHandler enabled={!routeLoading} onTapBus={handleTapBus} />
 
           <FitEverythingInView
             plannedRoute={plannedRoute}
-            busEta={busEta}
-            userEta={userEta}
+            remainingRoute={remainingRoute}
             busPoint={busPoint}
             userPoint={userPoint}
           />
@@ -314,95 +496,75 @@ export default function App() {
             pathOptions={{
               color: "#0f766e",
               fillColor: "#0f766e",
-              fillOpacity: 0.035,
+              fillOpacity: 0.03,
               weight: 2,
-              opacity: 0.35,
+              opacity: 0.25,
             }}
           />
 
           {plannedRoute.length > 0 && (
-            <Polyline
-              positions={plannedRoute.map((point) => [point.lat, point.lng])}
-              pathOptions={{
-                color: "#111827",
-                weight: 4,
-                opacity: 0.18,
-              }}
-            />
+            <>
+              <Polyline
+                positions={plannedRoute.map((point) => [point.lat, point.lng])}
+                pathOptions={{
+                  color: "#0f766e",
+                  weight: 11,
+                  opacity: 0.12,
+                  lineCap: "round",
+                  lineJoin: "round",
+                }}
+              />
+
+              <Polyline
+                positions={plannedRoute.map((point) => [point.lat, point.lng])}
+                pathOptions={{
+                  color: "#0f766e",
+                  weight: 5,
+                  opacity: 0.46,
+                  lineCap: "round",
+                  lineJoin: "round",
+                }}
+              />
+            </>
           )}
 
-          {userEta && userEta.routePoints.length > 0 && (
+          {remainingRoute.length > 0 && (
             <Polyline
-              positions={userEta.routePoints.map((point) => [
-                point.lat,
-                point.lng,
-              ])}
+              positions={remainingRoute.map((point) => [point.lat, point.lng])}
               pathOptions={{
-                color: "#2563eb",
-                weight: 5,
-                opacity: 0.58,
-              }}
-            />
-          )}
-
-          {busEta && busEta.routePoints.length > 0 && (
-            <Polyline
-              positions={busEta.routePoints.map((point) => [
-                point.lat,
-                point.lng,
-              ])}
-              pathOptions={{
-                color: "#0f766e",
+                color: "#14b8a6",
                 weight: 8,
-                opacity: 0.95,
+                opacity: 0.96,
+                lineCap: "round",
+                lineJoin: "round",
               }}
             />
           )}
 
-          <CircleMarker
-            center={[SOUTH_ORANGE_POINT.lat, SOUTH_ORANGE_POINT.lng]}
-            radius={8}
-            pathOptions={{
-              color: "#0f766e",
-              fillColor: "#ccfbf1",
-              fillOpacity: 1,
-              weight: 3,
-            }}
-          />
-
-          <CircleMarker
-            center={[CAMP_POINT.lat, CAMP_POINT.lng]}
-            radius={11}
-            pathOptions={{
-              color: "#7c2d12",
-              fillColor: "#fed7aa",
-              fillOpacity: 1,
-              weight: 4,
-            }}
-          />
-
-          <CircleMarker
-            center={[JCC_POINT.lat, JCC_POINT.lng]}
-            radius={12}
-            pathOptions={{
-              color: "#111827",
-              fillColor: "#ffffff",
-              fillOpacity: 1,
-              weight: 4,
-            }}
-          />
+          {ROUTE_CHECKPOINTS.map((checkpoint) => (
+            <CheckpointMarker key={checkpoint.id} checkpoint={checkpoint} />
+          ))}
 
           {userPoint && (
             <CircleMarker
               center={[userPoint.lat, userPoint.lng]}
-              radius={12}
+              radius={11}
               pathOptions={{
                 color: "#1d4ed8",
                 fillColor: "#93c5fd",
                 fillOpacity: 1,
                 weight: 4,
               }}
-            />
+            >
+              <Tooltip
+                permanent
+                direction="top"
+                offset={[0, -10]}
+                className="checkpointTooltip userTooltip"
+              >
+                You
+              </Tooltip>
+            </CircleMarker>
           )}
 
           {busPoint && (
@@ -415,7 +577,16 @@ export default function App() {
                 fillOpacity: 1,
                 weight: 5,
               }}
-            />
+            >
+              <Tooltip
+                permanent
+                direction="top"
+                offset={[0, -12]}
+                className="checkpointTooltip busTooltip"
+              >
+                Bus
+              </Tooltip>
+            </CircleMarker>
           )}
         </MapContainer>
       </section>
@@ -438,19 +609,28 @@ export default function App() {
               </>
             )}
 
-            {!error && loading && (
+            {!error && routeLoading && (
+              <>
+                <p className="label">Loading route</p>
+                <p className="mainText">Building the fixed Deeny route...</p>
+              </>
+            )}
+
+            {!error && !routeLoading && loading && (
               <>
                 <p className="label">Finding route</p>
                 <p className="mainText">
-                  Fitting bus, you, camp, and JCC on one screen...
+                  Snapping to the route and calculating your leave time...
                 </p>
               </>
             )}
 
-            {!error && !loading && !busPoint && (
+            {!error && !routeLoading && !loading && !busPoint && (
               <>
                 <p className="label">Ready</p>
-                <p className="mainText">Tap the bus location.</p>
+                <p className="mainText">
+                  Tap where the bus is on the highlighted route.
+                </p>
               </>
             )}
 
