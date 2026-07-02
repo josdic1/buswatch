@@ -9,7 +9,7 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -337,6 +337,8 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
 }
 
 export default function App() {
+  const requestIdRef = useRef(0);
+
   const [userPoint, setUserPoint] = useState<Point | null>(null);
   const [busPoint, setBusPoint] = useState<Point | null>(null);
 
@@ -419,6 +421,8 @@ export default function App() {
   }
 
   function resetBus() {
+    requestIdRef.current += 1;
+
     setBusPoint(null);
     setBusEta(null);
     setUserEta(null);
@@ -434,14 +438,21 @@ export default function App() {
       return;
     }
 
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
     setLogoLaunching(false);
 
     window.setTimeout(() => {
-      setLogoLaunching(true);
+      if (requestIdRef.current === requestId) {
+        setLogoLaunching(true);
+      }
     }, 20);
 
     window.setTimeout(() => {
-      setLogoLaunching(false);
+      if (requestIdRef.current === requestId) {
+        setLogoLaunching(false);
+      }
     }, 1250);
 
     const snapped = snapPointToRoute(clickedPoint, plannedRoute);
@@ -456,6 +467,8 @@ export default function App() {
     try {
       const currentUserPoint = userPoint ?? (await getUserLocation());
 
+      if (requestIdRef.current !== requestId) return;
+
       setUserPoint(currentUserPoint);
 
       const [nextBusEta, nextUserEta] = await Promise.all([
@@ -463,12 +476,18 @@ export default function App() {
         fetchEta(currentUserPoint, JCC_POINT),
       ]);
 
+      if (requestIdRef.current !== requestId) return;
+
       setBusEta(nextBusEta);
       setUserEta(nextUserEta);
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
+
       setError(err instanceof Error ? err.message : "Could not calculate ETA.");
     } finally {
-      setLoading(false);
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }
 
@@ -621,7 +640,24 @@ export default function App() {
         <div className="panelTop">
           <div className="handle" />
 
-          <button className="resetButton" onClick={resetBus}>
+          <button
+            type="button"
+            className="resetButton"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onTouchStart={(event) => {
+              event.stopPropagation();
+            }}
+            onMouseDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              resetBus();
+            }}
+          >
             Reset
           </button>
         </div>

@@ -92,6 +92,7 @@ button {
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
+  pointer-events: auto;
   padding: 0.65rem;
   border: 1px solid rgba(17, 24, 39, 0.1);
   border-radius: 26px;
@@ -105,8 +106,9 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 28px;
+  min-height: 32px;
   margin-bottom: 0.15rem;
+  pointer-events: auto;
 }
 
 .handle {
@@ -114,16 +116,17 @@ button {
   height: 5px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.2);
+  pointer-events: none;
 }
 
 .resetButton {
   position: absolute;
   right: 0;
   top: 0;
-  z-index: 3;
+  z-index: 50;
   border: 0;
   border-radius: 999px;
-  padding: 0.42rem 0.68rem;
+  padding: 0.46rem 0.76rem;
   background: #111827;
   color: white;
   font-size: 0.76rem;
@@ -131,6 +134,8 @@ button {
   letter-spacing: -0.01em;
   box-shadow: 0 8px 20px rgba(17, 24, 39, 0.18);
   touch-action: manipulation;
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .resetButton:active {
