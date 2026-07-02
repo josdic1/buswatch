@@ -90,6 +90,11 @@ button {
   right: 0.7rem;
   bottom: calc(0.7rem + env(safe-area-inset-bottom));
   z-index: 1000;
+  max-height: 42dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
   pointer-events: auto;
   padding: 0.65rem;
   border: 1px solid rgba(15, 23, 42, 0.1);
@@ -254,13 +259,13 @@ button {
   color: #991b1b;
 }
 
-.notifyButton {
+.notifyButton,
+.cancelAlertButton {
   width: 100%;
   margin-top: 0.58rem;
   border: 0;
   border-radius: 16px;
   padding: 0.82rem 1rem;
-  background: #14b8a6;
   color: white;
   font-size: 0.96rem;
   font-weight: 950;
@@ -269,9 +274,17 @@ button {
   cursor: pointer;
 }
 
+.notifyButton {
+  background: #14b8a6;
+}
+
+.cancelAlertButton {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .notifyButton:active,
 .cancelAlertButton:active,
-.stopAlarmButton:active {
+.alarmDismiss:active {
   transform: scale(0.98);
 }
 
@@ -279,51 +292,29 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.7rem;
-  margin-top: 0.58rem;
-  padding: 0.6rem 0.6rem 0.6rem 0.85rem;
-  border-radius: 16px;
-  background: rgba(20, 184, 166, 0.14);
-  border: 1px solid rgba(45, 212, 191, 0.28);
+  gap: 1rem;
+  margin-top: 0.72rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(45, 212, 191, 0.26);
 }
 
-.alertCountdownInfo {
-  display: flex;
-  align-items: baseline;
-  gap: 0.55rem;
-  min-width: 0;
-}
-
-.alertCountdownInfo span {
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 0.68rem;
+.alertCountdown span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.78rem;
   font-weight: 900;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  white-space: nowrap;
 }
 
-.alertCountdownInfo strong {
-  color: #5eead4;
-  font-size: 1.55rem;
+.alertCountdown strong {
+  color: white;
+  font-size: 1.65rem;
   line-height: 1;
   font-weight: 950;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-}
-
-.cancelAlertButton {
-  flex-shrink: 0;
-  border: 0;
-  border-radius: 12px;
-  padding: 0.58rem 0.9rem;
-  background: rgba(255, 255, 255, 0.12);
-  color: white;
-  font-size: 0.8rem;
-  font-weight: 900;
-  touch-action: manipulation;
-  pointer-events: auto;
-  cursor: pointer;
 }
 
 .alertStatus {
@@ -342,94 +333,71 @@ button {
   align-items: center;
   justify-content: center;
   padding: 1.2rem;
-  background: rgba(15, 23, 42, 0.72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(248, 113, 113, 0.22),
+      transparent 26rem
+    ),
+    rgba(127, 29, 29, 0.94);
+  animation: alarmFlash 0.72s infinite alternate;
   pointer-events: auto;
 }
 
-.alarmCard {
-  position: relative;
-  overflow: hidden;
-  width: min(440px, 100%);
-  border-radius: 30px;
-  padding: 2.2rem 1.4rem 1.2rem;
-  background: #111827;
-  border: 1px solid rgba(45, 212, 191, 0.24);
-  color: white;
+.alarmOverlayInner {
+  width: min(520px, 100%);
+  border-radius: 34px;
+  padding: 2rem 1.3rem 1.3rem;
+  background: white;
+  color: #7f1d1d;
   text-align: center;
-  box-shadow: 0 30px 100px rgba(2, 6, 23, 0.55);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.38);
 }
 
-.alarmPulse {
-  position: absolute;
-  left: 50%;
-  top: 34%;
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  border: 2px solid rgba(45, 212, 191, 0.35);
-  transform: translate(-50%, -50%);
-  animation: alarmBreath 2.2s infinite ease-out;
-  pointer-events: none;
-}
-
-@keyframes alarmBreath {
-  0% {
-    transform: translate(-50%, -50%) scale(0.55);
-    opacity: 0.55;
-  }
-
-  100% {
-    transform: translate(-50%, -50%) scale(1.25);
-    opacity: 0;
-  }
-}
-
-.alarmKicker {
-  position: relative;
-  z-index: 2;
-  margin: 0 0 0.5rem;
-  color: #5eead4;
-  font-size: 0.72rem;
-  font-weight: 950;
-  text-transform: uppercase;
-  letter-spacing: 0.2em;
+.alarmEmoji {
+  margin: 0 0 0.4rem;
+  font-size: 4rem;
+  line-height: 1;
 }
 
 .alarmTitle {
-  position: relative;
-  z-index: 2;
-  font-size: clamp(2.9rem, 14vw, 4.6rem);
-  line-height: 0.92;
-  font-weight: 950;
-  letter-spacing: -0.06em;
+  margin: 0;
+  font-size: clamp(3.6rem, 18vw, 6.4rem);
+  line-height: 0.85;
+  font-weight: 1000;
+  letter-spacing: -0.09em;
+  text-transform: uppercase;
 }
 
 .alarmSub {
-  position: relative;
-  z-index: 2;
-  margin: 0.8rem auto 0;
-  max-width: 16rem;
-  color: rgba(255, 255, 255, 0.68);
-  font-size: 1rem;
-  font-weight: 800;
+  margin: 1rem auto 0;
+  max-width: 18rem;
+  color: #991b1b;
+  font-size: 1.05rem;
+  font-weight: 850;
 }
 
-.stopAlarmButton {
-  position: relative;
-  z-index: 2;
+.alarmDismiss {
   width: 100%;
-  margin-top: 1.4rem;
+  margin-top: 1.2rem;
   border: 0;
-  border-radius: 18px;
-  padding: 0.95rem 1.2rem;
-  background: #14b8a6;
+  border-radius: 22px;
+  padding: 1rem 1.2rem;
+  background: #111827;
   color: white;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 950;
-  touch-action: manipulation;
   cursor: pointer;
+}
+
+@keyframes alarmFlash {
+  0% {
+    background-color: rgba(127, 29, 29, 0.9);
+  }
+
+  100% {
+    background-color: rgba(185, 28, 28, 0.94);
+  }
 }
 
 .checkpointTooltip {
@@ -475,6 +443,10 @@ button {
 }
 
 @media (max-height: 720px) {
+  .panel {
+    max-height: 50dvh;
+  }
+
   .etaNumber {
     font-size: 2.9rem;
   }
@@ -482,21 +454,12 @@ button {
   .statusCard {
     padding: 0.78rem;
   }
-
-  .stats div {
-    padding: 0.55rem 0.62rem;
-  }
-
-  .leaveSoon,
-  .leaveNow {
-    padding: 0.68rem 1rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .statusCard.waiting::before,
   .statusCard.waiting::after,
-  .alarmPulse {
+  .alarmOverlay {
     animation: none;
   }
 }

@@ -357,6 +357,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [alertStatus, setAlertStatus] = useState("");
+  const [locationStatus, setLocationStatus] = useState("");
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
   );
@@ -584,6 +585,26 @@ export default function App() {
     });
   }
 
+  async function enableLocation() {
+    setLocationStatus("Checking location...");
+
+    try {
+      const point = await getUserLocation();
+
+      setUserPoint(point);
+      setError("");
+      setLocationStatus("Location enabled.");
+      refitMap();
+    } catch (err) {
+      setLocationStatus("");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Location blocked. Allow location in Safari settings.",
+      );
+    }
+  }
+
   async function loadFixedRoute() {
     setRouteLoading(true);
 
@@ -611,6 +632,8 @@ export default function App() {
     setUserEta(null);
     setBusRouteStartIndex(null);
     setError("");
+    setAlertStatus("");
+    setLocationStatus(userPoint ? "Location enabled." : "");
     setLoading(false);
     refitMap();
   }
@@ -633,6 +656,7 @@ export default function App() {
     setBusEta(null);
     setUserEta(null);
     setError("");
+    setAlertStatus("");
     setLoading(true);
 
     try {
@@ -641,6 +665,7 @@ export default function App() {
       if (requestIdRef.current !== requestId) return;
 
       setUserPoint(currentUserPoint);
+      setLocationStatus("Location enabled.");
 
       const [nextBusEta, nextUserEta] = await Promise.all([
         fetchEta(snapped.point, JCC_POINT),
@@ -896,8 +921,39 @@ export default function App() {
               <>
                 <p className="label">Ready</p>
                 <p className="mainText">
-                  Tap where the bus is on the highlighted route.
+                  Enable location first. Then tap where the bus is on the route.
                 </p>
+
+                {!userPoint && (
+                  <button
+                    type="button"
+                    className="notifyButton"
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onTouchStart={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      enableLocation();
+                    }}
+                  >
+                    Enable location
+                  </button>
+                )}
+
+                {userPoint && (
+                  <p className="alertStatus">Location enabled. Tap the bus.</p>
+                )}
+
+                {locationStatus && !userPoint && (
+                  <p className="alertStatus">{locationStatus}</p>
+                )}
               </>
             )}
 
@@ -959,32 +1015,32 @@ export default function App() {
 
                 {alarmArmed && (
                   <div className="alertCountdown">
-                    <div className="alertCountdownInfo">
-                      <span>Alarm in</span>
-                      <strong>{formatCountdown(secondsLeft)}</strong>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="cancelAlertButton"
-                      onPointerDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onTouchStart={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onMouseDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        cancelAlarm();
-                      }}
-                    >
-                      Cancel
-                    </button>
+                    <span>Alarm in</span>
+                    <strong>{formatCountdown(secondsLeft)}</strong>
                   </div>
+                )}
+
+                {alarmArmed && (
+                  <button
+                    type="button"
+                    className="cancelAlertButton"
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onTouchStart={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      cancelAlarm();
+                    }}
+                  >
+                    Cancel
+                  </button>
                 )}
 
                 {alertStatus && <p className="alertStatus">{alertStatus}</p>}
@@ -996,15 +1052,14 @@ export default function App() {
 
       {alarmFiring && (
         <div className="alarmOverlay">
-          <div className="alarmCard">
-            <div className="alarmPulse" />
-            <p className="alarmKicker">Deeny Bus</p>
-            <div className="alarmTitle">Leave now</div>
-            <p className="alarmSub">It’s time to go.</p>
+          <div className="alarmOverlayInner">
+            <p className="alarmEmoji">🚌</p>
+            <p className="alarmTitle">Leave now</p>
+            <p className="alarmSub">Deeny bus timing says it’s time to go.</p>
 
             <button
               type="button"
-              className="stopAlarmButton"
+              className="alarmDismiss"
               onClick={dismissAlarm}
             >
               I’m going
