@@ -34,15 +34,6 @@ type RouteCheckpoint = {
   labelOpacity?: number;
 };
 
-type AudioWindow = Window &
-  typeof globalThis & {
-    webkitAudioContext?: typeof AudioContext;
-  };
-
-type VibratingNavigator = Navigator & {
-  vibrate?: (pattern: number | number[]) => boolean;
-};
-
 const SOUTH_ORANGE_POINT: Point = {
   lat: 40.7489,
   lng: -74.2613,
@@ -209,10 +200,8 @@ function snapPointToRoute(target: Point, routePoints: Point[]) {
 }
 
 function formatCountdown(totalSeconds: number) {
-  const safeSeconds = Math.max(0, totalSeconds);
-  const minutes = Math.floor(safeSeconds / 60);
-  const seconds = safeSeconds % 60;
-
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
@@ -260,19 +249,26 @@ function TapBusHandler({
 }
 
 function FitEverythingInView({
+  fitVersion,
   plannedRoute,
   remainingRoute,
   busPoint,
   userPoint,
 }: {
+  fitVersion: number;
   plannedRoute: Point[];
   remainingRoute: Point[];
   busPoint: Point | null;
   userPoint: Point | null;
 }) {
   const map = useMap();
+  const lastFitVersionRef = useRef(-1);
 
   useEffect(() => {
+    // Only refit when explicitly asked. Never fight the user's fingers.
+    if (fitVersion === lastFitVersionRef.current) return;
+    lastFitVersionRef.current = fitVersion;
+
     const points: Point[] = [CAMP_POINT, JCC_POINT];
 
     if (plannedRoute.length > 0) {
@@ -291,10 +287,9 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map((point) => [
-      point.lat,
-      point.lng,
-    ] as [number, number]);
+    const bounds = points.map(
+      (point) => [point.lat, point.lng] as [number, number],
+    );
 
     map.fitBounds(bounds, {
       paddingTopLeft: [34, 34],
@@ -302,7 +297,7 @@ function FitEverythingInView({
       maxZoom: 10,
       animate: true,
     });
-  }, [plannedRoute, remainingRoute, busPoint, userPoint, map]);
+  }, [fitVersion, plannedRoute, remainingRoute, busPoint, userPoint, map]);
 
   return null;
 }
@@ -366,9 +361,14 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
 
 export default function App() {
   const requestIdRef = useRef(0);
-  const leaveAlertTimerRef = useRef<number | null>(null);
-  const alarmIntervalRef = useRef<number | null>(null);
+
+  // Alarm machinery. No magic:
+  // - audioContextRef: created + resumed on the button tap (iOS requires a user gesture)
+  // - sirenStopRef: function that kills the siren + vibration loop
+  // - wakeLockRef: keeps the screen on while the alarm is armed
   const audioContextRef = useRef<AudioContext | null>(null);
+  const sirenStopRef = useRef<(() => void) | null>(null);
+  const wakeLockRef = useRef<any>(null);
 
   const [userPoint, setUserPoint] = useState<Point | null>(null);
   const [busPoint, setBusPoint] = useState<Point | null>(null);
@@ -382,16 +382,15 @@ export default function App() {
   const [logoLaunching, setLogoLaunching] = useState(false);
   const [error, setError] = useState("");
   const [alertStatus, setAlertStatus] = useState("");
-  const [alertTargetTimeMs, setAlertTargetTimeMs] = useState<number | null>(
-    null,
-  );
-  const [alertCountdownSeconds, setAlertCountdownSeconds] = useState<
-    number | null
-  >(null);
-  const [alarmActive, setAlarmActive] = useState(false);
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
   );
+  const [fitVersion, setFitVersion] = useState(0);
+
+  // Alarm state: target timestamp, live countdown, and whether it's ringing
+  const [alarmTargetMs, setAlarmTargetMs] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const [alarmFiring, setAlarmFiring] = useState(false);
 
   const remainingRoute = useMemo(() => {
     if (
@@ -409,159 +408,203 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes -
-      userEta.durationMinutes -
-      EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
-  async function primeAlarmAudio() {
-    const audioWindow = window as AudioWindow;
-    const AudioContextConstructor =
-      audioWindow.AudioContext || audioWindow.webkitAudioContext;
+  function refitMap() {
+    setFitVersion((version) => version + 1);
+  }
 
-    if (!AudioContextConstructor) return;
+  // ---------- Alarm: audio ----------
 
+  function unlockAudio() {
     if (!audioContextRef.current) {
-      audioContextRef.current = new AudioContextConstructor();
+      const Ctx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+
+      if (!Ctx) return;
+
+      audioContextRef.current = new Ctx();
     }
 
-    if (audioContextRef.current.state === "suspended") {
-      await audioContextRef.current.resume();
+    // resume() inside a tap handler is what unlocks audio on iOS
+    audioContextRef.current.resume();
+  }
+
+  function startSiren() {
+    const ctx = audioContextRef.current;
+    if (!ctx) return null;
+
+    ctx.resume();
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0.5;
+    gain.connect(ctx.destination);
+
+    const osc = ctx.createOscillator();
+    osc.type = "square";
+    osc.frequency.value = 880;
+    osc.connect(gain);
+    osc.start();
+
+    // Two-tone siren: flip pitch every 350ms
+    let high = true;
+    const pitchTimer = window.setInterval(() => {
+      high = !high;
+      osc.frequency.setValueAtTime(high ? 880 : 620, ctx.currentTime);
+    }, 350);
+
+    // Re-fire vibration every second so it keeps buzzing
+    const vibrateTimer = window.setInterval(() => {
+      navigator.vibrate?.([350, 120, 350]);
+    }, 1000);
+
+    navigator.vibrate?.([350, 120, 350]);
+
+    return () => {
+      window.clearInterval(pitchTimer);
+      window.clearInterval(vibrateTimer);
+      navigator.vibrate?.(0);
+      osc.stop();
+      osc.disconnect();
+      gain.disconnect();
+    };
+  }
+
+  // ---------- Alarm: wake lock ----------
+
+  async function requestWakeLock() {
+    try {
+      const wakeLockApi = (navigator as any).wakeLock;
+      if (!wakeLockApi) return;
+
+      wakeLockRef.current = await wakeLockApi.request("screen");
+    } catch {
+      // Wake lock denied (low battery mode, etc). Alarm still works
+      // as long as the screen stays on.
     }
   }
 
-  function vibrateAlarm() {
-    const vibratingNavigator = navigator as VibratingNavigator;
-    vibratingNavigator.vibrate?.([500, 180, 500, 180, 700]);
-  }
-
-  function playBeep() {
-    const audioContext = audioContextRef.current;
-
-    if (!audioContext) return;
-
-    if (audioContext.state === "suspended") {
-      audioContext.resume();
-    }
-
-    const oscillator = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    const now = audioContext.currentTime;
-
-    oscillator.type = "square";
-    oscillator.frequency.setValueAtTime(880, now);
-    oscillator.frequency.setValueAtTime(660, now + 0.18);
-
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.32, now + 0.03);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.46);
-
-    oscillator.connect(gain);
-    gain.connect(audioContext.destination);
-
-    oscillator.start(now);
-    oscillator.stop(now + 0.5);
-  }
-
-  function stopAlarmSound() {
-    if (alarmIntervalRef.current !== null) {
-      window.clearInterval(alarmIntervalRef.current);
-      alarmIntervalRef.current = null;
+  function releaseWakeLock() {
+    if (wakeLockRef.current) {
+      wakeLockRef.current.release?.();
+      wakeLockRef.current = null;
     }
   }
 
-  function startAlarmSound() {
-    stopAlarmSound();
+  // ---------- Alarm: lifecycle ----------
 
-    playBeep();
-    vibrateAlarm();
-
-    alarmIntervalRef.current = window.setInterval(() => {
-      playBeep();
-      vibrateAlarm();
-    }, 1100);
-  }
-
-  function clearLeaveAlert() {
-    if (leaveAlertTimerRef.current !== null) {
-      window.clearTimeout(leaveAlertTimerRef.current);
-      leaveAlertTimerRef.current = null;
-    }
-
-    stopAlarmSound();
-    setAlertTargetTimeMs(null);
-    setAlertCountdownSeconds(null);
-    setAlarmActive(false);
+  function fireAlarm() {
+    setAlarmFiring(true);
     setAlertStatus("");
-  }
 
-  function stopLeaveAlarm() {
-    stopAlarmSound();
-    setAlarmActive(false);
-    setAlertTargetTimeMs(null);
-    setAlertCountdownSeconds(null);
-    setAlertStatus("Alarm stopped.");
-  }
+    sirenStopRef.current?.();
+    sirenStopRef.current = startSiren();
 
-  async function requestNotificationPermission() {
-    if (!("Notification" in window)) return false;
-
-    if (Notification.permission === "granted") return true;
-
-    if (Notification.permission === "denied") return false;
-
-    const permission = await Notification.requestPermission();
-    return permission === "granted";
-  }
-
-  function fireLeaveAlarm() {
-    leaveAlertTimerRef.current = null;
-    setAlertTargetTimeMs(null);
-    setAlertCountdownSeconds(0);
-    setAlarmActive(true);
-    setAlertStatus("Leave alarm firing.");
-
+    // Best-effort notification. On iOS Safari this usually won't show
+    // unless the app is installed to the home screen — the siren and
+    // overlay are the real alarm.
     if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Leave now", {
-        body: "Deeny bus timing says it’s time to go.",
-        icon: "/logo.png",
-      });
+      try {
+        new Notification("Leave now", {
+          body: "Deeny bus timing says it’s time to go.",
+          icon: "/logo.png",
+        });
+      } catch {
+        // fine, overlay + siren carry it
+      }
     }
-
-    startAlarmSound();
   }
 
-  async function scheduleLeaveAlarm() {
+  function dismissAlarm() {
+    sirenStopRef.current?.();
+    sirenStopRef.current = null;
+
+    setAlarmFiring(false);
+    setAlarmTargetMs(null);
+    setSecondsLeft(null);
+    setAlertStatus("");
+    releaseWakeLock();
+  }
+
+  function cancelAlarm() {
+    dismissAlarm();
+  }
+
+  function setLeaveAlarm() {
     if (leaveInMinutes === null) return;
 
-    await primeAlarmAudio();
-    await requestNotificationPermission();
+    // This runs inside the tap = our one chance to unlock audio on iOS
+    unlockAudio();
 
-    if (leaveAlertTimerRef.current !== null) {
-      window.clearTimeout(leaveAlertTimerRef.current);
-      leaveAlertTimerRef.current = null;
+    // Ask for notification permission as a bonus, don't block on it
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
     }
 
-    stopAlarmSound();
-    setAlarmActive(false);
-
     const safeLeaveInMinutes = Math.max(0, leaveInMinutes);
-    const delayMs = safeLeaveInMinutes * 60 * 1000;
-    const targetTimeMs = Date.now() + delayMs;
 
-    setAlertTargetTimeMs(targetTimeMs);
-    setAlertCountdownSeconds(Math.ceil(delayMs / 1000));
-    setAlertStatus(
-      safeLeaveInMinutes <= 0
-        ? "Alarm firing now."
-        : `Alarm set for ${safeLeaveInMinutes} min.`,
-    );
+    if (safeLeaveInMinutes <= 0) {
+      fireAlarm();
+      return;
+    }
 
-    leaveAlertTimerRef.current = window.setTimeout(() => {
-      fireLeaveAlarm();
-    }, delayMs);
+    requestWakeLock();
+    setAlarmTargetMs(Date.now() + safeLeaveInMinutes * 60 * 1000);
+    setAlertStatus("Keep the app open — screen will stay awake.");
   }
+
+  // Countdown ticker. Computes from Date.now() every tick, so even if
+  // iOS throttles the interval, the remaining time is always correct.
+  useEffect(() => {
+    if (alarmTargetMs === null) return;
+
+    let fired = false;
+
+    const tick = () => {
+      const remaining = Math.ceil((alarmTargetMs - Date.now()) / 1000);
+
+      if (remaining <= 0) {
+        if (!fired) {
+          fired = true;
+          setSecondsLeft(0);
+          setAlarmTargetMs(null);
+          fireAlarm();
+        }
+        return;
+      }
+
+      setSecondsLeft(remaining);
+    };
+
+    tick();
+    const interval = window.setInterval(tick, 250);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [alarmTargetMs]);
+
+  // iOS drops the wake lock when you background the tab. Re-grab it
+  // when the user comes back and the alarm is still armed.
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && alarmTargetMs !== null) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [alarmTargetMs]);
+
+  // ---------- Existing app logic ----------
 
   async function getUserLocation(): Promise<Point> {
     if (!navigator.geolocation) {
@@ -578,7 +621,9 @@ export default function App() {
         },
         () => {
           reject(
-            new Error("Location blocked. Allow location and tap the route again."),
+            new Error(
+              "Location blocked. Allow location and tap the route again.",
+            ),
           );
         },
         {
@@ -600,6 +645,7 @@ export default function App() {
 
       setPlannedRoute(route);
       setError("");
+      refitMap();
     } catch {
       setError("Could not load the Deeny route.");
     } finally {
@@ -609,7 +655,7 @@ export default function App() {
 
   function resetBus() {
     requestIdRef.current += 1;
-    clearLeaveAlert();
+    dismissAlarm();
 
     setBusPoint(null);
     setBusEta(null);
@@ -618,6 +664,7 @@ export default function App() {
     setError("");
     setLoading(false);
     setLogoLaunching(false);
+    refitMap();
   }
 
   async function handleTapBus(clickedPoint: Point) {
@@ -626,7 +673,7 @@ export default function App() {
       return;
     }
 
-    clearLeaveAlert();
+    dismissAlarm();
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
@@ -670,6 +717,7 @@ export default function App() {
 
       setBusEta(nextBusEta);
       setUserEta(nextUserEta);
+      refitMap();
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
 
@@ -685,34 +733,12 @@ export default function App() {
     loadFixedRoute();
 
     return () => {
-      if (leaveAlertTimerRef.current !== null) {
-        window.clearTimeout(leaveAlertTimerRef.current);
-      }
-
-      stopAlarmSound();
+      sirenStopRef.current?.();
+      releaseWakeLock();
     };
   }, []);
 
-  useEffect(() => {
-    if (alertTargetTimeMs === null || alarmActive) return;
-
-    const updateCountdown = () => {
-      const secondsLeft = Math.max(
-        0,
-        Math.ceil((alertTargetTimeMs - Date.now()) / 1000),
-      );
-
-      setAlertCountdownSeconds(secondsLeft);
-    };
-
-    updateCountdown();
-
-    const countdownInterval = window.setInterval(updateCountdown, 1000);
-
-    return () => {
-      window.clearInterval(countdownInterval);
-    };
-  }, [alertTargetTimeMs, alarmActive]);
+  const alarmArmed = alarmTargetMs !== null && secondsLeft !== null;
 
   return (
     <main className="app">
@@ -723,21 +749,15 @@ export default function App() {
           minZoom={8}
           maxZoom={17}
           maxBounds={NORTH_JERSEY_BOUNDS}
-          maxBoundsViscosity={0.85}
+          maxBoundsViscosity={0.4}
           zoomControl={false}
           className="map"
-          dragging={true}
-          touchZoom="center"
-          doubleClickZoom={true}
-          scrollWheelZoom={false}
+          touchZoom={true}
+          scrollWheelZoom={true}
           boxZoom={false}
           keyboard={false}
-          inertia={true}
-          inertiaDeceleration={2800}
-          inertiaMaxSpeed={900}
           zoomSnap={0.25}
           zoomDelta={0.5}
-          preferCanvas={true}
           bounceAtZoomLimits={false}
         >
           <TileLayer
@@ -748,6 +768,7 @@ export default function App() {
           <TapBusHandler enabled={!routeLoading} onTapBus={handleTapBus} />
 
           <FitEverythingInView
+            fitVersion={fitVersion}
             plannedRoute={plannedRoute}
             remainingRoute={remainingRoute}
             busPoint={busPoint}
@@ -843,28 +864,6 @@ export default function App() {
         </MapContainer>
       </section>
 
-      {alarmActive && (
-        <section className="alarmOverlay" role="alert">
-          <div className="alarmCard">
-            <p className="alarmKicker">DEENYWHEREUAT</p>
-            <h1>LEAVE NOW</h1>
-            <p>The bus timing says it is time to go.</p>
-
-            <button
-              type="button"
-              className="stopAlarmButton"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                stopLeaveAlarm();
-              }}
-            >
-              Stop alarm
-            </button>
-          </div>
-        </section>
-      )}
-
       <section className="panel">
         <div className="panelTop">
           <div className="handle" />
@@ -957,19 +956,10 @@ export default function App() {
                     : `Leave in ${leaveInMinutes} min`}
                 </div>
 
-                {alertTargetTimeMs !== null &&
-                  alertCountdownSeconds !== null &&
-                  !alarmActive && (
-                    <div className="alertCountdown">
-                      <span>Alarm in</span>
-                      <strong>{formatCountdown(alertCountdownSeconds)}</strong>
-                    </div>
-                  )}
-
                 {leaveInMinutes !== null &&
                   leaveInMinutes > 0 &&
-                  alertTargetTimeMs === null &&
-                  !alarmActive && (
+                  !alarmArmed &&
+                  !alarmFiring && (
                     <button
                       type="button"
                       className="notifyButton"
@@ -985,25 +975,41 @@ export default function App() {
                       onClick={(event) => {
                         event.preventDefault();
                         event.stopPropagation();
-                        scheduleLeaveAlarm();
+                        setLeaveAlarm();
                       }}
                     >
-                      Start loud leave alarm
+                      Alert me when to leave
                     </button>
                   )}
 
-                {alertTargetTimeMs !== null && !alarmActive && (
-                  <button
-                    type="button"
-                    className="cancelAlertButton"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      clearLeaveAlert();
-                    }}
-                  >
-                    Cancel alarm
-                  </button>
+                {alarmArmed && (
+                  <div className="countdownBox">
+                    <div className="countdownInfo">
+                      <span>Alarm in</span>
+                      <strong>{formatCountdown(secondsLeft)}</strong>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="countdownCancel"
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onTouchStart={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onMouseDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cancelAlarm();
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 )}
 
                 {alertStatus && <p className="alertStatus">{alertStatus}</p>}
@@ -1012,6 +1018,24 @@ export default function App() {
           </div>
         </div>
       </section>
+
+      {alarmFiring && (
+        <div className="alarmOverlay">
+          <div className="alarmOverlayInner">
+            <p className="alarmEmoji">🚌</p>
+            <p className="alarmTitle">Leave now</p>
+            <p className="alarmSub">Deeny bus timing says it’s time to go.</p>
+
+            <button
+              type="button"
+              className="alarmDismiss"
+              onClick={dismissAlarm}
+            >
+              I’m going
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
