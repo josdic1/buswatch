@@ -90,13 +90,13 @@ button {
   right: 0.7rem;
   bottom: calc(0.7rem + env(safe-area-inset-bottom));
   z-index: 1000;
-  max-height: 42dvh;
+  max-height: 56dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
   pointer-events: auto;
-  padding: 0.65rem;
+  padding: 0.55rem;
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 26px;
   background: rgba(248, 250, 252, 0.96);
@@ -110,7 +110,7 @@ button {
   align-items: center;
   justify-content: center;
   min-height: 32px;
-  margin-bottom: 0.15rem;
+  margin-bottom: 0.12rem;
   pointer-events: auto;
 }
 
@@ -161,7 +161,7 @@ button {
 .statusCard {
   position: relative;
   overflow: hidden;
-  padding: 0.9rem;
+  padding: 0.78rem;
   border-radius: 22px;
   background: #111827;
   color: white;
@@ -200,8 +200,8 @@ button {
 }
 
 .label {
-  margin: 0 0 0.22rem;
-  font-size: 0.72rem;
+  margin: 0 0 0.28rem;
+  font-size: 0.7rem;
   font-weight: 900;
   color: rgba(255, 255, 255, 0.62);
   text-transform: uppercase;
@@ -226,57 +226,102 @@ button {
   font-weight: 800;
 }
 
-.etaNumber {
-  font-size: 3.25rem;
-  line-height: 0.95;
-  font-weight: 950;
+.etaGrid {
+  display: grid;
+  grid-template-columns: 0.92fr 1.08fr;
+  gap: 0.58rem;
+  align-items: stretch;
+}
+
+.etaMain,
+.leaveBadge {
+  min-height: 78px;
+  border-radius: 18px;
+  padding: 0.72rem 0.78rem;
+}
+
+.etaMain {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.28rem;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.etaMain strong {
+  display: block;
+  font-size: clamp(2.75rem, 12vw, 4rem);
+  line-height: 0.9;
+  font-weight: 1000;
   letter-spacing: -0.09em;
+  color: white;
+  font-variant-numeric: tabular-nums;
+}
+
+.etaMain span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.leaveBadge {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: #ccfbf1;
+  color: #115e59;
+  text-align: center;
+}
+
+.leaveBadge.urgent {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.leaveBadge span {
+  display: block;
+  margin-bottom: 0.12rem;
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.72;
+}
+
+.leaveBadge strong {
+  display: block;
+  font-size: clamp(1.15rem, 5vw, 1.55rem);
+  line-height: 1.05;
+  font-weight: 1000;
+  letter-spacing: -0.04em;
 }
 
 .stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.55rem;
-  margin-top: 0.72rem;
+  gap: 0.5rem;
+  margin-top: 0.58rem;
 }
 
 .stats div {
-  padding: 0.68rem;
+  padding: 0.62rem 0.68rem;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.08);
 }
 
 .stats span {
   display: block;
-  margin-bottom: 0.18rem;
+  margin-bottom: 0.16rem;
   color: rgba(255, 255, 255, 0.58);
-  font-size: 0.7rem;
-  font-weight: 800;
+  font-size: 0.68rem;
+  font-weight: 850;
 }
 
 .stats strong {
   display: block;
   font-size: 0.98rem;
-}
-
-.leaveSoon,
-.leaveNow {
-  margin-top: 0.72rem;
-  padding: 0.82rem 1rem;
-  border-radius: 18px;
-  font-size: 1rem;
+  line-height: 1;
   font-weight: 950;
-  text-align: center;
-}
-
-.leaveSoon {
-  background: #ccfbf1;
-  color: #115e59;
-}
-
-.leaveNow {
-  background: #fee2e2;
-  color: #991b1b;
 }
 
 .notifyButton,
@@ -285,7 +330,7 @@ button {
   margin-top: 0.58rem;
   border: 0;
   border-radius: 16px;
-  padding: 0.82rem 1rem;
+  padding: 0.78rem 0.9rem;
   color: white;
   font-size: 0.96rem;
   font-weight: 950;
@@ -315,8 +360,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-top: 0.72rem;
-  padding: 0.9rem 1rem;
+  margin-top: 0.58rem;
+  padding: 0.75rem 0.88rem;
   border-radius: 18px;
   background: rgba(20, 184, 166, 0.16);
   border: 1px solid rgba(45, 212, 191, 0.26);
@@ -324,25 +369,25 @@ button {
 
 .alertCountdown span {
   color: rgba(255, 255, 255, 0.62);
-  font-size: 0.78rem;
-  font-weight: 900;
+  font-size: 0.76rem;
+  font-weight: 950;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
 .alertCountdown strong {
   color: white;
-  font-size: 1.65rem;
+  font-size: 1.45rem;
   line-height: 1;
-  font-weight: 950;
+  font-weight: 1000;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
 }
 
 .alertStatus {
-  margin: 0.55rem 0 0;
+  margin: 0.5rem 0 0;
   color: rgba(255, 255, 255, 0.7);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 800;
   text-align: center;
 }
@@ -582,15 +627,30 @@ button {
 
 @media (max-height: 720px) {
   .panel {
-    max-height: 50dvh;
-  }
-
-  .etaNumber {
-    font-size: 2.9rem;
+    max-height: 58dvh;
   }
 
   .statusCard {
-    padding: 0.78rem;
+    padding: 0.68rem;
+  }
+
+  .etaMain,
+  .leaveBadge {
+    min-height: 68px;
+    padding: 0.62rem;
+  }
+
+  .etaMain strong {
+    font-size: 2.55rem;
+  }
+
+  .stats div {
+    padding: 0.54rem 0.58rem;
+  }
+
+  .notifyButton,
+  .cancelAlertButton {
+    padding: 0.68rem 0.85rem;
   }
 }
 

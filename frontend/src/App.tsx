@@ -272,7 +272,7 @@ function FitEverythingInView({
 
     map.fitBounds(bounds, {
       paddingTopLeft: [34, 34],
-      paddingBottomRight: [34, 275],
+      paddingBottomRight: [34, 265],
       maxZoom: 10,
       animate: true,
     });
@@ -961,7 +961,27 @@ export default function App() {
               <>
                 <p className="label">Bus ETA to JCC</p>
 
-                <div className="etaNumber">{busEta.durationMinutes} min</div>
+                <div className="etaGrid">
+                  <div className="etaMain">
+                    <strong>{busEta.durationMinutes}</strong>
+                    <span>min</span>
+                  </div>
+
+                  <div
+                    className={
+                      leaveInMinutes !== null && leaveInMinutes <= 0
+                        ? "leaveBadge urgent"
+                        : "leaveBadge"
+                    }
+                  >
+                    <span>Leave</span>
+                    <strong>
+                      {leaveInMinutes !== null && leaveInMinutes <= 0
+                        ? "now"
+                        : `in ${leaveInMinutes} min`}
+                    </strong>
+                  </div>
+                </div>
 
                 <div className="stats">
                   <div>
@@ -973,18 +993,6 @@ export default function App() {
                     <span>Cushion</span>
                     <strong>{EXTRA_CUSHION_MINUTES} min</strong>
                   </div>
-                </div>
-
-                <div
-                  className={
-                    leaveInMinutes !== null && leaveInMinutes <= 0
-                      ? "leaveNow"
-                      : "leaveSoon"
-                  }
-                >
-                  {leaveInMinutes !== null && leaveInMinutes <= 0
-                    ? "Leave now"
-                    : `Leave in ${leaveInMinutes} min`}
                 </div>
 
                 {leaveInMinutes !== null &&
@@ -1016,7 +1024,7 @@ export default function App() {
                 {alarmArmed && (
                   <div className="alertCountdown">
                     <span>Alarm in</span>
-                    <strong>{formatCountdown(secondsLeft)}</strong>
+                    <strong>{formatCountdown(secondsLeft ?? 0)}</strong>
                   </div>
                 )}
 
