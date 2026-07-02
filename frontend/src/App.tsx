@@ -365,6 +365,7 @@ export default function App() {
   const [alarmTargetMs, setAlarmTargetMs] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [alarmFiring, setAlarmFiring] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const remainingRoute = useMemo(() => {
     if (
@@ -571,7 +572,7 @@ export default function App() {
         () => {
           reject(
             new Error(
-              "Location blocked. Allow location and tap the route again.",
+              "Location blocked. Open Help for steps to allow location.",
             ),
           );
         },
@@ -611,6 +612,7 @@ export default function App() {
     setUserEta(null);
     setBusRouteStartIndex(null);
     setError("");
+    setAlertStatus("");
     setLoading(false);
     refitMap();
   }
@@ -633,6 +635,7 @@ export default function App() {
     setBusEta(null);
     setUserEta(null);
     setError("");
+    setAlertStatus("");
     setLoading(true);
 
     try {
@@ -716,6 +719,22 @@ export default function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [alarmTargetMs]);
+
+  useEffect(() => {
+    if (!helpOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setHelpOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [helpOpen]);
 
   return (
     <main className="app">
@@ -843,6 +862,28 @@ export default function App() {
 
       <section className="panel">
         <div className="panelTop">
+          <button
+            type="button"
+            className="helpButton"
+            aria-label="Open help"
+            onPointerDown={(event) => {
+              event.stopPropagation();
+            }}
+            onTouchStart={(event) => {
+              event.stopPropagation();
+            }}
+            onMouseDown={(event) => {
+              event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              setHelpOpen(true);
+            }}
+          >
+            ?
+          </button>
+
           <div className="handle" />
 
           <button
@@ -873,6 +914,18 @@ export default function App() {
               <>
                 <p className="label danger">Problem</p>
                 <p className="mainText">{error}</p>
+
+                <button
+                  type="button"
+                  className="notifyButton"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setHelpOpen(true);
+                  }}
+                >
+                  Open Help
+                </button>
               </>
             )}
 
@@ -897,6 +950,9 @@ export default function App() {
                 <p className="label">Ready</p>
                 <p className="mainText">
                   Tap where the bus is on the highlighted route.
+                </p>
+                <p className="helperText">
+                  Need location or Home Screen help? Tap the ? button.
                 </p>
               </>
             )}
@@ -959,32 +1015,32 @@ export default function App() {
 
                 {alarmArmed && (
                   <div className="alertCountdown">
-                    <div className="alertCountdownInfo">
-                      <span>Alarm in</span>
-                      <strong>{formatCountdown(secondsLeft)}</strong>
-                    </div>
-
-                    <button
-                      type="button"
-                      className="cancelAlertButton"
-                      onPointerDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onTouchStart={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onMouseDown={(event) => {
-                        event.stopPropagation();
-                      }}
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        cancelAlarm();
-                      }}
-                    >
-                      Cancel
-                    </button>
+                    <span>Alarm in</span>
+                    <strong>{formatCountdown(secondsLeft)}</strong>
                   </div>
+                )}
+
+                {alarmArmed && (
+                  <button
+                    type="button"
+                    className="cancelAlertButton"
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onTouchStart={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      cancelAlarm();
+                    }}
+                  >
+                    Cancel
+                  </button>
                 )}
 
                 {alertStatus && <p className="alertStatus">{alertStatus}</p>}
@@ -994,17 +1050,85 @@ export default function App() {
         </div>
       </section>
 
-      {alarmFiring && (
-        <div className="alarmOverlay">
-          <div className="alarmCard">
-            <div className="alarmPulse" />
-            <p className="alarmKicker">Deeny Bus</p>
-            <div className="alarmTitle">Leave now</div>
-            <p className="alarmSub">It’s time to go.</p>
+      {helpOpen && (
+        <div
+          className="helpOverlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="help-title"
+        >
+          <div className="helpModal">
+            <div className="helpHeader">
+              <div>
+                <p className="helpKicker">Tsadie Help</p>
+                <h2 id="help-title">Setup steps</h2>
+              </div>
+
+              <button
+                type="button"
+                className="helpClose"
+                aria-label="Close help"
+                onClick={() => {
+                  setHelpOpen(false);
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="helpSection">
+              <h3>Allow location</h3>
+              <ol>
+                <li>Open the iPhone Settings app.</li>
+                <li>Tap Privacy &amp; Security.</li>
+                <li>Tap Location Services.</li>
+                <li>Make sure Location Services is ON.</li>
+                <li>Scroll down and tap Safari Websites.</li>
+                <li>Choose While Using the App.</li>
+                <li>Come back to Tsadie and tap the bus route again.</li>
+              </ol>
+
+              <p className="helpNote">
+                If Tsadie appears as its own app in Settings, tap Tsadie, then
+                tap Location, then choose While Using the App.
+              </p>
+            </div>
+
+            <div className="helpSection">
+              <h3>Add Tsadie to the Home Screen</h3>
+              <ol>
+                <li>Open Safari on the iPhone.</li>
+                <li>Go to the Tsadie website.</li>
+                <li>Tap the Share button. It looks like a square with an arrow.</li>
+                <li>Scroll down and tap Add to Home Screen.</li>
+                <li>Tap Add.</li>
+                <li>Use the Tsadie icon on the Home Screen like an app.</li>
+              </ol>
+            </div>
 
             <button
               type="button"
-              className="stopAlarmButton"
+              className="helpDone"
+              onClick={() => {
+                setHelpOpen(false);
+              }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {alarmFiring && (
+        <div className="alarmOverlay">
+          <div className="alarmOverlayInner">
+            <p className="alarmEmoji">🚌</p>
+            <p className="alarmTitle">Leave now</p>
+            <p className="alarmSub">Deeny bus timing says it’s time to go.</p>
+
+            <button
+              type="button"
+              className="alarmDismiss"
               onClick={dismissAlarm}
             >
               I’m going
