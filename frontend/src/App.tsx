@@ -130,6 +130,22 @@ const NORTH_JERSEY_BOUNDS: LatLngBoundsExpression = [
 
 const EXTRA_CUSHION_MINUTES = 5;
 
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = `${base64String}${padding}`
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let index = 0; index < rawData.length; index += 1) {
+    outputArray[index] = rawData.charCodeAt(index);
+  }
+
+  return outputArray;
+}
+
 async function fetchEta(from: Point, to: Point): Promise<EtaResult> {
   const params = new URLSearchParams({
     fromLat: String(from.lat),
@@ -357,6 +373,10 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [alertStatus, setAlertStatus] = useState("");
+  const [pushStatus, setPushStatus] = useState("");
+  const [pushEndpoint, setPushEndpoint] = useState<string | null>(null);
+  const [scheduledPushId, setScheduledPushId] = useState<string | null>(null);
+
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
   );
@@ -494,7 +514,7 @@ export default function App() {
 
       wakeLockRef.current = await wakeLockApi.request("screen");
     } catch {
-      // Ignore. Alert still works while Tsadie stays open and visible.
+      // Ignore. Push/in-app alerts still try their best.
     }
   }
 
@@ -535,19 +555,146 @@ export default function App() {
     releaseWakeLock();
   }
 
+  async function getPushPublicKey() {
+    const res = await fetch(`${API_URL}/push/public-key`);
+
+    if (!res.ok) {
+      throw new Error("Push is not configured yet.");
+    }
+
+    const data = await res.json();
+
+    if (!data.publicKey) {
+      throw new Error("Missing push public key.");
+    }
+
+    return String(data.publicKey);
+  }
+
+  async function enablePushNotifications() {
+    if (!window.isSecureContext && window.location.hostname !== "localhost") {
+      setPushStatus("Push needs HTTPS. Use the installed app or live site.");
+      return null;
+    }
+
+    if (!("serviceWorker" in navigator)) {
+      setPushStatus("Push is not supported in this browser.");
+      return null;
+    }
+
+    if (!("PushManager" in window)) {
+      setPushStatus("Push is not supported in this browser.");
+      return null;
+    }
+
+    if (!("Notification" in window)) {
+      setPushStatus("Notifications are not supported in this browser.");
+      return null;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission !== "granted") {
+      setPushStatus("Push blocked. Allow notifications to use push alerts.");
+      return null;
+    }
+
+    const publicKey = await getPushPublicKey();
+
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicKey),
+      });
+    }
+
+    const res = await fetch(`${API_URL}/push/subscribe`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        subscription,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error("Could not save push subscription.");
+    }
+
+    const data = await res.json();
+    const endpoint = String(data.endpoint || subscription.endpoint);
+
+    setPushEndpoint(endpoint);
+    setPushStatus("Push notifications enabled.");
+
+    return endpoint;
+  }
+
+  async function schedulePushLeaveAlert(delaySeconds: number) {
+    try {
+      const endpoint = pushEndpoint ?? (await enablePushNotifications());
+
+      if (!endpoint) {
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/push/schedule-leave`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          endpoint,
+          delaySeconds,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Could not schedule push alert.");
+      }
+
+      const data = await res.json();
+
+      setScheduledPushId(String(data.scheduleId || ""));
+      setPushStatus("Push alert scheduled.");
+    } catch {
+      setPushStatus("Push unavailable. In-app alert is still running.");
+    }
+  }
+
+  async function cancelScheduledPushAlert() {
+    if (!scheduledPushId) return;
+
+    try {
+      await fetch(
+        `${API_URL}/push/schedule/${encodeURIComponent(scheduledPushId)}`,
+        {
+          method: "DELETE",
+        },
+      );
+    } catch {
+      // In-app alarm cancel still works.
+    } finally {
+      setScheduledPushId(null);
+    }
+  }
+
   function cancelAlarm() {
+    void cancelScheduledPushAlert();
     dismissAlarm();
   }
 
-  function setLeaveAlarm() {
+  async function setLeaveAlarm() {
     if (leaveInMinutes === null) return;
 
     setAlertWarningOpen(false);
     unlockAudio();
-
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission().catch(() => {});
-    }
 
     const safeLeaveInMinutes = Math.max(0, leaveInMinutes);
 
@@ -558,11 +705,14 @@ export default function App() {
 
     requestWakeLock();
 
-    const targetMs = Date.now() + safeLeaveInMinutes * 60 * 1000;
+    const delaySeconds = Math.ceil(safeLeaveInMinutes * 60);
+    const targetMs = Date.now() + delaySeconds * 1000;
 
     setAlarmTargetMs(targetMs);
-    setSecondsLeft(Math.ceil(safeLeaveInMinutes * 60));
-    setAlertStatus("Countdown live. Return to Tsadie before it reaches zero.");
+    setSecondsLeft(delaySeconds);
+    setAlertStatus("Countdown live. Push alert scheduled when available.");
+
+    await schedulePushLeaveAlert(delaySeconds);
   }
 
   async function getUserLocation(): Promise<Point> {
@@ -614,6 +764,7 @@ export default function App() {
 
   function resetBus() {
     requestIdRef.current += 1;
+    void cancelScheduledPushAlert();
     dismissAlarm();
 
     setBusPoint(null);
@@ -622,6 +773,7 @@ export default function App() {
     setBusRouteStartIndex(null);
     setError("");
     setAlertStatus("");
+    setPushStatus("");
     setLoading(false);
     refitMap();
   }
@@ -632,6 +784,7 @@ export default function App() {
       return;
     }
 
+    void cancelScheduledPushAlert();
     dismissAlarm();
 
     const requestId = requestIdRef.current + 1;
@@ -645,6 +798,7 @@ export default function App() {
     setUserEta(null);
     setError("");
     setAlertStatus("");
+    setPushStatus("");
     setLoading(true);
 
     try {
@@ -962,7 +1116,7 @@ export default function App() {
                   Tap where the bus is on the highlighted route.
                 </p>
                 <p className="helperText">
-                  In-app alert now. Push notifications coming soon.
+                  In-app alert now. Push notifications available when installed.
                 </p>
               </>
             )}
@@ -1028,11 +1182,12 @@ export default function App() {
                           setAlertWarningOpen(true);
                         }}
                       >
-                        Set in-app alert
+                        Set alert
                       </button>
 
                       <p className="miniNotice">
-                        In-app alert now. Push notifications coming soon.
+                        In-app alert now. Push notifications available when
+                        installed.
                       </p>
 
                       {backupTimerMinutes !== null && (
@@ -1049,7 +1204,7 @@ export default function App() {
                     <strong>Countdown live</strong>
                     <span>
                       You can use your phone, but return to Tsadie before the
-                      timer reaches zero.
+                      timer reaches zero. Push will fire if enabled.
                     </span>
                   </div>
                 )}
@@ -1092,6 +1247,7 @@ export default function App() {
                 )}
 
                 {alertStatus && <p className="alertStatus">{alertStatus}</p>}
+                {pushStatus && <p className="alertStatus">{pushStatus}</p>}
               </>
             )}
           </div>
@@ -1106,33 +1262,39 @@ export default function App() {
           aria-labelledby="alert-info-title"
         >
           <div className="alertInfoModal">
-            <p className="alertInfoKicker">In-app alert</p>
+            <p className="alertInfoKicker">Alert</p>
             <h2 id="alert-info-title">Tsadie keeps time</h2>
 
             <p className="alertInfoText">
-              Tsadie keeps the countdown live while the app is open.
+              Tsadie runs an in-app countdown now. If notifications are allowed,
+              Tsadie also schedules a push alert.
             </p>
 
             <div className="alertRules">
-              <div>You can use your phone.</div>
-              <div>Come back to Tsadie before the timer reaches zero.</div>
-              <div>Tsadie must be on screen when the alert is due.</div>
+              <div>Best setup: add Tsadie to your iPhone Home Screen.</div>
+              <div>Allow notifications when asked.</div>
+              <div>You can use your phone while waiting.</div>
+              <div>Keep the iPhone timer backup for absolute safety.</div>
             </div>
 
             {backupTimerMinutes !== null && (
               <div className="foolproofBox">
                 <span>Foolproof backup</span>
-                <strong>Set an iPhone timer for {backupTimerMinutes} min</strong>
+                <strong>
+                  Set an iPhone timer for {backupTimerMinutes} min
+                </strong>
               </div>
             )}
 
-            <p className="alertSoon">Push notifications coming soon.</p>
+            <p className="alertSoon">
+              Push notifications available when installed.
+            </p>
 
             <button
               type="button"
               className="alertPrimary"
               onClick={() => {
-                setLeaveAlarm();
+                void setLeaveAlarm();
               }}
             >
               Set alert
@@ -1200,7 +1362,9 @@ export default function App() {
               <ol>
                 <li>Open Safari on the iPhone.</li>
                 <li>Go to the Tsadie website.</li>
-                <li>Tap the Share button. It looks like a square with an arrow.</li>
+                <li>
+                  Tap the Share button. It looks like a square with an arrow.
+                </li>
                 <li>Scroll down and tap Add to Home Screen.</li>
                 <li>Tap Add.</li>
                 <li>Use the Tsadie icon on the Home Screen like an app.</li>
@@ -1210,11 +1374,10 @@ export default function App() {
             <div className="helpSection">
               <h3>About alerts</h3>
               <ol>
-                <li>Tsadie keeps the countdown live while the app is open.</li>
-                <li>You can use your phone while waiting.</li>
-                <li>Come back to Tsadie before the timer reaches zero.</li>
-                <li>Tsadie must be on screen when the alert is due.</li>
-                <li>Push notifications are coming soon.</li>
+                <li>In-app alerts work while Tsadie is open and running.</li>
+                <li>Push alerts work after notifications are allowed.</li>
+                <li>For iPhone, add Tsadie to the Home Screen first.</li>
+                <li>Use the iPhone timer backup if the timing is critical.</li>
               </ol>
             </div>
 
