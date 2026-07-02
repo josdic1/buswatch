@@ -334,19 +334,41 @@ button {
 
 .miniNotice {
   margin: 0.5rem 0 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.66);
   font-size: 0.72rem;
   line-height: 1.32;
-  font-weight: 800;
+  font-weight: 850;
   text-align: center;
+}
+
+.backupNotice {
+  margin: 0.5rem 0 0;
+  padding: 0.62rem 0.74rem;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.78rem;
+  line-height: 1.28;
+  font-weight: 850;
+  text-align: center;
+}
+
+.backupNotice strong {
+  color: #fde68a;
+  font-weight: 1000;
+}
+
+.backupNotice.active {
+  background: rgba(251, 191, 36, 0.13);
+  border: 1px solid rgba(251, 191, 36, 0.22);
 }
 
 .keepOpenBanner {
   margin-top: 0.58rem;
   padding: 0.72rem 0.82rem;
   border-radius: 16px;
-  background: rgba(251, 191, 36, 0.16);
-  border: 1px solid rgba(251, 191, 36, 0.28);
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(45, 212, 191, 0.26);
 }
 
 .keepOpenBanner strong,
@@ -356,7 +378,7 @@ button {
 }
 
 .keepOpenBanner strong {
-  color: #fde68a;
+  color: #99f6e4;
   font-size: 0.78rem;
   font-weight: 1000;
   text-transform: uppercase;
@@ -379,8 +401,7 @@ button {
   margin-top: 0.58rem;
   padding: 0.75rem 0.88rem;
   border-radius: 18px;
-  background: rgba(20, 184, 166, 0.16);
-  border: 1px solid rgba(45, 212, 191, 0.26);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .alertCountdown span {
@@ -475,17 +496,44 @@ button {
 .alertRules div {
   border-radius: 16px;
   padding: 0.78rem 0.88rem;
+  background: #ecfeff;
+  color: #155e75;
+  font-size: 0.94rem;
+  line-height: 1.28;
+  font-weight: 950;
+}
+
+.foolproofBox {
+  margin-top: 0.9rem;
+  padding: 0.9rem;
+  border-radius: 18px;
   background: #fff7ed;
   color: #9a3412;
-  font-size: 0.96rem;
-  font-weight: 950;
+  border: 1px solid #fed7aa;
+}
+
+.foolproofBox span {
+  display: block;
+  margin-bottom: 0.18rem;
+  font-size: 0.72rem;
+  font-weight: 1000;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.foolproofBox strong {
+  display: block;
+  font-size: 1.02rem;
+  line-height: 1.22;
+  font-weight: 1000;
 }
 
 .alertSoon {
   margin: 0.82rem 0 0;
   color: #0f766e;
-  font-size: 0.86rem;
-  font-weight: 950;
+  font-size: 0.9rem;
+  font-weight: 1000;
 }
 
 .alertPrimary,

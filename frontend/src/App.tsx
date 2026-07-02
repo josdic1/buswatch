@@ -388,6 +388,12 @@ export default function App() {
     );
   }, [busEta, userEta]);
 
+  const backupTimerMinutes = useMemo(() => {
+    if (leaveInMinutes === null) return null;
+
+    return Math.max(1, Math.floor(leaveInMinutes));
+  }, [leaveInMinutes]);
+
   const alarmArmed = alarmTargetMs !== null && secondsLeft !== null;
 
   function refitMap() {
@@ -488,7 +494,7 @@ export default function App() {
 
       wakeLockRef.current = await wakeLockApi.request("screen");
     } catch {
-      // Ignore. Alarm still works while the screen stays awake.
+      // Ignore. Alert still works while Tsadie stays open and visible.
     }
   }
 
@@ -512,7 +518,7 @@ export default function App() {
           body: "Tsadie says it’s time to go.",
         });
       } catch {
-        // Overlay and sound still handle the alarm.
+        // Overlay and sound still handle the alert.
       }
     }
   }
@@ -555,8 +561,8 @@ export default function App() {
     const targetMs = Date.now() + safeLeaveInMinutes * 60 * 1000;
 
     setAlarmTargetMs(targetMs);
-    setSecondsLeft(safeLeaveInMinutes * 60);
-    setAlertStatus("Alarm active. Keep this screen open.");
+    setSecondsLeft(Math.ceil(safeLeaveInMinutes * 60));
+    setAlertStatus("Countdown live. Return to Tsadie before it reaches zero.");
   }
 
   async function getUserLocation(): Promise<Point> {
@@ -956,8 +962,7 @@ export default function App() {
                   Tap where the bus is on the highlighted route.
                 </p>
                 <p className="helperText">
-                  In-app alerts require this screen to stay open. Push
-                  notifications coming soon.
+                  In-app alert now. Push notifications coming soon.
                 </p>
               </>
             )}
@@ -1023,28 +1028,44 @@ export default function App() {
                           setAlertWarningOpen(true);
                         }}
                       >
-                        Keep app open + alert me
+                        Set in-app alert
                       </button>
 
                       <p className="miniNotice">
-                        Push notifications coming soon. For now, the alert only
-                        works while Tsadie stays open.
+                        In-app alert now. Push notifications coming soon.
                       </p>
+
+                      {backupTimerMinutes !== null && (
+                        <p className="backupNotice">
+                          Foolproof backup: set an iPhone timer for{" "}
+                          <strong>{backupTimerMinutes} min</strong>.
+                        </p>
+                      )}
                     </>
                   )}
 
                 {alarmArmed && (
                   <div className="keepOpenBanner">
-                    <strong>Alarm active</strong>
-                    <span>Keep this screen open and do not lock the phone.</span>
+                    <strong>Countdown live</strong>
+                    <span>
+                      You can use your phone, but return to Tsadie before the
+                      timer reaches zero.
+                    </span>
                   </div>
                 )}
 
                 {alarmArmed && (
                   <div className="alertCountdown">
-                    <span>Alarm in</span>
+                    <span>Alert in</span>
                     <strong>{formatCountdown(secondsLeft ?? 0)}</strong>
                   </div>
+                )}
+
+                {alarmArmed && backupTimerMinutes !== null && (
+                  <p className="backupNotice active">
+                    Foolproof backup: set an iPhone timer for{" "}
+                    <strong>{backupTimerMinutes} min</strong>.
+                  </p>
                 )}
 
                 {alarmArmed && (
@@ -1085,19 +1106,25 @@ export default function App() {
           aria-labelledby="alert-info-title"
         >
           <div className="alertInfoModal">
-            <p className="alertInfoKicker">Important</p>
-            <h2 id="alert-info-title">Keep Tsadie open</h2>
+            <p className="alertInfoKicker">In-app alert</p>
+            <h2 id="alert-info-title">Tsadie keeps time</h2>
 
             <p className="alertInfoText">
-              This in-app alert only works while Tsadie stays open on this
-              screen.
+              Tsadie keeps the countdown live while the app is open.
             </p>
 
             <div className="alertRules">
-              <div>Do not lock the phone.</div>
-              <div>Do not close Tsadie.</div>
-              <div>Do not switch to another app.</div>
+              <div>You can use your phone.</div>
+              <div>Come back to Tsadie before the timer reaches zero.</div>
+              <div>Tsadie must be on screen when the alert is due.</div>
             </div>
+
+            {backupTimerMinutes !== null && (
+              <div className="foolproofBox">
+                <span>Foolproof backup</span>
+                <strong>Set an iPhone timer for {backupTimerMinutes} min</strong>
+              </div>
+            )}
 
             <p className="alertSoon">Push notifications coming soon.</p>
 
@@ -1108,7 +1135,7 @@ export default function App() {
                 setLeaveAlarm();
               }}
             >
-              I understand — set alert
+              Set alert
             </button>
 
             <button
@@ -1183,8 +1210,10 @@ export default function App() {
             <div className="helpSection">
               <h3>About alerts</h3>
               <ol>
-                <li>Current alerts work only while Tsadie stays open.</li>
-                <li>Do not lock the phone while the alert is counting down.</li>
+                <li>Tsadie keeps the countdown live while the app is open.</li>
+                <li>You can use your phone while waiting.</li>
+                <li>Come back to Tsadie before the timer reaches zero.</li>
+                <li>Tsadie must be on screen when the alert is due.</li>
                 <li>Push notifications are coming soon.</li>
               </ol>
             </div>
