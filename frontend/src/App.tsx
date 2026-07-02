@@ -251,9 +251,10 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map(
-      (point) => [point.lat, point.lng] as [number, number],
-    );
+    const bounds = points.map((point) => [
+      point.lat,
+      point.lng,
+    ] as [number, number]);
 
     map.fitBounds(bounds, {
       paddingTopLeft: [36, 36],
@@ -267,8 +268,18 @@ function FitEverythingInView({
 }
 
 function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
+  const roadFade: Record<string, number> = {
+    i80: 0.95,
+    rt10: 0.78,
+    mtpleasant: 0.62,
+    shrewsbury: 0.46,
+    northfield: 0.32,
+  };
+
+  const roadOpacity = roadFade[checkpoint.id] ?? 1;
+
   const radius =
-    checkpoint.kind === "camp" ? 10 : checkpoint.kind === "jcc" ? 11 : 7;
+    checkpoint.kind === "camp" ? 10 : checkpoint.kind === "jcc" ? 11 : 6;
 
   const pathOptions =
     checkpoint.kind === "camp"
@@ -276,6 +287,7 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
           color: "#7c2d12",
           fillColor: "#fed7aa",
           fillOpacity: 1,
+          opacity: 1,
           weight: 3,
         }
       : checkpoint.kind === "jcc"
@@ -283,14 +295,21 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
             color: "#111827",
             fillColor: "#ffffff",
             fillOpacity: 1,
+            opacity: 1,
             weight: 4,
           }
         : {
             color: "#0f766e",
             fillColor: "#ccfbf1",
-            fillOpacity: 1,
-            weight: 3,
+            fillOpacity: 0.72 * roadOpacity,
+            opacity: 0.55 * roadOpacity,
+            weight: 2,
           };
+
+  const tooltipClassName =
+    checkpoint.kind === "road"
+      ? `checkpointTooltip roadTooltip roadTooltip-${checkpoint.id}`
+      : "checkpointTooltip";
 
   return (
     <CircleMarker
@@ -302,7 +321,7 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
         permanent
         direction="top"
         offset={[0, -10]}
-        className="checkpointTooltip"
+        className={tooltipClassName}
       >
         {checkpoint.label}
       </Tooltip>
@@ -342,7 +361,9 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes -
+      userEta.durationMinutes -
+      EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
@@ -361,9 +382,7 @@ export default function App() {
         },
         () => {
           reject(
-            new Error(
-              "Location blocked. Allow location and tap the route again.",
-            ),
+            new Error("Location blocked. Allow location and tap the route again."),
           );
         },
         {
