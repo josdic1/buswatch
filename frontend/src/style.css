@@ -381,13 +381,13 @@ button {
   color: #991b1b;
 }
 
-.notifyButton {
+.notifyButton,
+.cancelAlertButton {
   width: 100%;
   margin-top: 0.58rem;
   border: 0;
   border-radius: 16px;
   padding: 0.82rem 1rem;
-  background: rgba(255, 255, 255, 0.12);
   color: white;
   font-size: 0.96rem;
   font-weight: 950;
@@ -396,8 +396,46 @@ button {
   cursor: pointer;
 }
 
-.notifyButton:active {
+.notifyButton {
+  background: #14b8a6;
+}
+
+.cancelAlertButton {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.notifyButton:active,
+.cancelAlertButton:active,
+.stopAlarmButton:active {
   transform: scale(0.98);
+}
+
+.alertCountdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.72rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  background: rgba(20, 184, 166, 0.16);
+  border: 1px solid rgba(45, 212, 191, 0.26);
+}
+
+.alertCountdown span {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.alertCountdown strong {
+  color: white;
+  font-size: 1.65rem;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.04em;
 }
 
 .alertStatus {
@@ -406,6 +444,78 @@ button {
   font-size: 0.78rem;
   font-weight: 800;
   text-align: center;
+}
+
+.alarmOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at center, rgba(248, 113, 113, 0.18), transparent 26rem),
+    rgba(127, 29, 29, 0.92);
+  animation: alarmFlash 0.72s infinite alternate;
+  pointer-events: auto;
+}
+
+.alarmCard {
+  width: min(520px, 100%);
+  border-radius: 34px;
+  padding: 2rem 1.3rem 1.3rem;
+  background: white;
+  color: #7f1d1d;
+  text-align: center;
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.38);
+}
+
+.alarmKicker {
+  margin: 0 0 0.4rem;
+  color: #991b1b;
+  font-size: 0.75rem;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.alarmCard h1 {
+  margin: 0;
+  font-size: clamp(3.5rem, 18vw, 6.4rem);
+  line-height: 0.85;
+  font-weight: 1000;
+  letter-spacing: -0.09em;
+}
+
+.alarmCard p {
+  margin: 1rem auto 0;
+  max-width: 18rem;
+  color: #991b1b;
+  font-size: 1.05rem;
+  font-weight: 850;
+}
+
+.stopAlarmButton {
+  width: 100%;
+  margin-top: 1.2rem;
+  border: 0;
+  border-radius: 22px;
+  padding: 1rem 1.2rem;
+  background: #111827;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 950;
+  cursor: pointer;
+}
+
+@keyframes alarmFlash {
+  0% {
+    background-color: rgba(127, 29, 29, 0.9);
+  }
+
+  100% {
+    background-color: rgba(185, 28, 28, 0.94);
+  }
 }
 
 .checkpointTooltip {
@@ -478,7 +588,8 @@ button {
   .logoBox.launching .appLogo,
   .logoBox.launching::before,
   .statusCard.waiting::before,
-  .statusCard.waiting::after {
+  .statusCard.waiting::after,
+  .alarmOverlay {
     animation: none;
   }
 }

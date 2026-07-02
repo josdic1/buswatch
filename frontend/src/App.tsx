@@ -34,6 +34,15 @@ type RouteCheckpoint = {
   labelOpacity?: number;
 };
 
+type AudioWindow = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
+type VibratingNavigator = Navigator & {
+  vibrate?: (pattern: number | number[]) => boolean;
+};
+
 const SOUTH_ORANGE_POINT: Point = {
   lat: 40.7489,
   lng: -74.2613,
@@ -199,6 +208,14 @@ function snapPointToRoute(target: Point, routePoints: Point[]) {
   };
 }
 
+function formatCountdown(totalSeconds: number) {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function AppLogo({
   loading,
   launching,
@@ -243,26 +260,19 @@ function TapBusHandler({
 }
 
 function FitEverythingInView({
-  fitVersion,
   plannedRoute,
   remainingRoute,
   busPoint,
   userPoint,
 }: {
-  fitVersion: number;
   plannedRoute: Point[];
   remainingRoute: Point[];
   busPoint: Point | null;
   userPoint: Point | null;
 }) {
   const map = useMap();
-  const lastFitVersionRef = useRef(-1);
 
   useEffect(() => {
-    // Only refit when explicitly asked. Never fight the user's fingers.
-    if (fitVersion === lastFitVersionRef.current) return;
-    lastFitVersionRef.current = fitVersion;
-
     const points: Point[] = [CAMP_POINT, JCC_POINT];
 
     if (plannedRoute.length > 0) {
@@ -281,9 +291,10 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map(
-      (point) => [point.lat, point.lng] as [number, number],
-    );
+    const bounds = points.map((point) => [
+      point.lat,
+      point.lng,
+    ] as [number, number]);
 
     map.fitBounds(bounds, {
       paddingTopLeft: [34, 34],
@@ -291,7 +302,7 @@ function FitEverythingInView({
       maxZoom: 10,
       animate: true,
     });
-  }, [fitVersion, plannedRoute, remainingRoute, busPoint, userPoint, map]);
+  }, [plannedRoute, remainingRoute, busPoint, userPoint, map]);
 
   return null;
 }
@@ -356,6 +367,8 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
 export default function App() {
   const requestIdRef = useRef(0);
   const leaveAlertTimerRef = useRef<number | null>(null);
+  const alarmIntervalRef = useRef<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const [userPoint, setUserPoint] = useState<Point | null>(null);
   const [busPoint, setBusPoint] = useState<Point | null>(null);
@@ -369,10 +382,16 @@ export default function App() {
   const [logoLaunching, setLogoLaunching] = useState(false);
   const [error, setError] = useState("");
   const [alertStatus, setAlertStatus] = useState("");
+  const [alertTargetTimeMs, setAlertTargetTimeMs] = useState<number | null>(
+    null,
+  );
+  const [alertCountdownSeconds, setAlertCountdownSeconds] = useState<
+    number | null
+  >(null);
+  const [alarmActive, setAlarmActive] = useState(false);
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
   );
-  const [fitVersion, setFitVersion] = useState(0);
 
   const remainingRoute = useMemo(() => {
     if (
@@ -390,12 +409,78 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes -
+      userEta.durationMinutes -
+      EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
-  function refitMap() {
-    setFitVersion((version) => version + 1);
+  async function primeAlarmAudio() {
+    const audioWindow = window as AudioWindow;
+    const AudioContextConstructor =
+      audioWindow.AudioContext || audioWindow.webkitAudioContext;
+
+    if (!AudioContextConstructor) return;
+
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContextConstructor();
+    }
+
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume();
+    }
+  }
+
+  function vibrateAlarm() {
+    const vibratingNavigator = navigator as VibratingNavigator;
+    vibratingNavigator.vibrate?.([500, 180, 500, 180, 700]);
+  }
+
+  function playBeep() {
+    const audioContext = audioContextRef.current;
+
+    if (!audioContext) return;
+
+    if (audioContext.state === "suspended") {
+      audioContext.resume();
+    }
+
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    const now = audioContext.currentTime;
+
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(880, now);
+    oscillator.frequency.setValueAtTime(660, now + 0.18);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.32, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.46);
+
+    oscillator.connect(gain);
+    gain.connect(audioContext.destination);
+
+    oscillator.start(now);
+    oscillator.stop(now + 0.5);
+  }
+
+  function stopAlarmSound() {
+    if (alarmIntervalRef.current !== null) {
+      window.clearInterval(alarmIntervalRef.current);
+      alarmIntervalRef.current = null;
+    }
+  }
+
+  function startAlarmSound() {
+    stopAlarmSound();
+
+    playBeep();
+    vibrateAlarm();
+
+    alarmIntervalRef.current = window.setInterval(() => {
+      playBeep();
+      vibrateAlarm();
+    }, 1100);
   }
 
   function clearLeaveAlert() {
@@ -404,64 +489,77 @@ export default function App() {
       leaveAlertTimerRef.current = null;
     }
 
+    stopAlarmSound();
+    setAlertTargetTimeMs(null);
+    setAlertCountdownSeconds(null);
+    setAlarmActive(false);
     setAlertStatus("");
   }
 
+  function stopLeaveAlarm() {
+    stopAlarmSound();
+    setAlarmActive(false);
+    setAlertTargetTimeMs(null);
+    setAlertCountdownSeconds(null);
+    setAlertStatus("Alarm stopped.");
+  }
+
   async function requestNotificationPermission() {
-    if (!("Notification" in window)) {
-      setAlertStatus("Notifications are not available here.");
-      return false;
-    }
+    if (!("Notification" in window)) return false;
 
     if (Notification.permission === "granted") return true;
 
-    if (Notification.permission === "denied") {
-      setAlertStatus("Notifications are blocked in Safari settings.");
-      return false;
-    }
+    if (Notification.permission === "denied") return false;
 
     const permission = await Notification.requestPermission();
-
-    if (permission !== "granted") {
-      setAlertStatus("Notification permission was not allowed.");
-      return false;
-    }
-
-    return true;
+    return permission === "granted";
   }
 
-  async function scheduleLeaveNotification() {
+  function fireLeaveAlarm() {
+    leaveAlertTimerRef.current = null;
+    setAlertTargetTimeMs(null);
+    setAlertCountdownSeconds(0);
+    setAlarmActive(true);
+    setAlertStatus("Leave alarm firing.");
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("Leave now", {
+        body: "Deeny bus timing says it’s time to go.",
+        icon: "/logo.png",
+      });
+    }
+
+    startAlarmSound();
+  }
+
+  async function scheduleLeaveAlarm() {
     if (leaveInMinutes === null) return;
 
-    const canNotify = await requestNotificationPermission();
-    if (!canNotify) return;
+    await primeAlarmAudio();
+    await requestNotificationPermission();
 
     if (leaveAlertTimerRef.current !== null) {
       window.clearTimeout(leaveAlertTimerRef.current);
       leaveAlertTimerRef.current = null;
     }
 
+    stopAlarmSound();
+    setAlarmActive(false);
+
     const safeLeaveInMinutes = Math.max(0, leaveInMinutes);
     const delayMs = safeLeaveInMinutes * 60 * 1000;
+    const targetTimeMs = Date.now() + delayMs;
 
+    setAlertTargetTimeMs(targetTimeMs);
+    setAlertCountdownSeconds(Math.ceil(delayMs / 1000));
     setAlertStatus(
       safeLeaveInMinutes <= 0
-        ? "Leave alert firing now."
-        : `Leave alert set for ${safeLeaveInMinutes} min.`,
+        ? "Alarm firing now."
+        : `Alarm set for ${safeLeaveInMinutes} min.`,
     );
 
     leaveAlertTimerRef.current = window.setTimeout(() => {
-      new Notification("Leave now", {
-        body: "Deeny bus timing says it’s time to go.",
-        icon: "/logo.png",
-      });
-
-      if ("vibrate" in navigator) {
-        navigator.vibrate?.([400, 180, 400]);
-      }
-
-      leaveAlertTimerRef.current = null;
-      setAlertStatus("Leave alert sent.");
+      fireLeaveAlarm();
     }, delayMs);
   }
 
@@ -480,9 +578,7 @@ export default function App() {
         },
         () => {
           reject(
-            new Error(
-              "Location blocked. Allow location and tap the route again.",
-            ),
+            new Error("Location blocked. Allow location and tap the route again."),
           );
         },
         {
@@ -504,7 +600,6 @@ export default function App() {
 
       setPlannedRoute(route);
       setError("");
-      refitMap();
     } catch {
       setError("Could not load the Deeny route.");
     } finally {
@@ -523,7 +618,6 @@ export default function App() {
     setError("");
     setLoading(false);
     setLogoLaunching(false);
-    refitMap();
   }
 
   async function handleTapBus(clickedPoint: Point) {
@@ -576,7 +670,6 @@ export default function App() {
 
       setBusEta(nextBusEta);
       setUserEta(nextUserEta);
-      refitMap();
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
 
@@ -595,8 +688,31 @@ export default function App() {
       if (leaveAlertTimerRef.current !== null) {
         window.clearTimeout(leaveAlertTimerRef.current);
       }
+
+      stopAlarmSound();
     };
   }, []);
+
+  useEffect(() => {
+    if (alertTargetTimeMs === null || alarmActive) return;
+
+    const updateCountdown = () => {
+      const secondsLeft = Math.max(
+        0,
+        Math.ceil((alertTargetTimeMs - Date.now()) / 1000),
+      );
+
+      setAlertCountdownSeconds(secondsLeft);
+    };
+
+    updateCountdown();
+
+    const countdownInterval = window.setInterval(updateCountdown, 1000);
+
+    return () => {
+      window.clearInterval(countdownInterval);
+    };
+  }, [alertTargetTimeMs, alarmActive]);
 
   return (
     <main className="app">
@@ -607,15 +723,21 @@ export default function App() {
           minZoom={8}
           maxZoom={17}
           maxBounds={NORTH_JERSEY_BOUNDS}
-          maxBoundsViscosity={0.4}
+          maxBoundsViscosity={0.85}
           zoomControl={false}
           className="map"
-          touchZoom={true}
-          scrollWheelZoom={true}
+          dragging={true}
+          touchZoom="center"
+          doubleClickZoom={true}
+          scrollWheelZoom={false}
           boxZoom={false}
           keyboard={false}
+          inertia={true}
+          inertiaDeceleration={2800}
+          inertiaMaxSpeed={900}
           zoomSnap={0.25}
           zoomDelta={0.5}
+          preferCanvas={true}
           bounceAtZoomLimits={false}
         >
           <TileLayer
@@ -626,7 +748,6 @@ export default function App() {
           <TapBusHandler enabled={!routeLoading} onTapBus={handleTapBus} />
 
           <FitEverythingInView
-            fitVersion={fitVersion}
             plannedRoute={plannedRoute}
             remainingRoute={remainingRoute}
             busPoint={busPoint}
@@ -722,6 +843,28 @@ export default function App() {
         </MapContainer>
       </section>
 
+      {alarmActive && (
+        <section className="alarmOverlay" role="alert">
+          <div className="alarmCard">
+            <p className="alarmKicker">DEENYWHEREUAT</p>
+            <h1>LEAVE NOW</h1>
+            <p>The bus timing says it is time to go.</p>
+
+            <button
+              type="button"
+              className="stopAlarmButton"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                stopLeaveAlarm();
+              }}
+            >
+              Stop alarm
+            </button>
+          </div>
+        </section>
+      )}
+
       <section className="panel">
         <div className="panelTop">
           <div className="handle" />
@@ -814,26 +957,52 @@ export default function App() {
                     : `Leave in ${leaveInMinutes} min`}
                 </div>
 
-                {leaveInMinutes !== null && leaveInMinutes > 0 && (
+                {alertTargetTimeMs !== null &&
+                  alertCountdownSeconds !== null &&
+                  !alarmActive && (
+                    <div className="alertCountdown">
+                      <span>Alarm in</span>
+                      <strong>{formatCountdown(alertCountdownSeconds)}</strong>
+                    </div>
+                  )}
+
+                {leaveInMinutes !== null &&
+                  leaveInMinutes > 0 &&
+                  alertTargetTimeMs === null &&
+                  !alarmActive && (
+                    <button
+                      type="button"
+                      className="notifyButton"
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onTouchStart={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onMouseDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        scheduleLeaveAlarm();
+                      }}
+                    >
+                      Start loud leave alarm
+                    </button>
+                  )}
+
+                {alertTargetTimeMs !== null && !alarmActive && (
                   <button
                     type="button"
-                    className="notifyButton"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onTouchStart={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onMouseDown={(event) => {
-                      event.stopPropagation();
-                    }}
+                    className="cancelAlertButton"
                     onClick={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
-                      scheduleLeaveNotification();
+                      clearLeaveAlert();
                     }}
                   >
-                    Alert me when to leave
+                    Cancel alarm
                   </button>
                 )}
 
