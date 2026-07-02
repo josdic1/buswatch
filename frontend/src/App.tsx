@@ -49,14 +49,6 @@ const JCC_POINT: Point = {
   lng: -74.2916,
 };
 
-/**
- * Fixed Deeny route.
- *
- * Important:
- * The previous route got off I-80 too early because Rt 10 was used
- * as an early anchor. This version keeps the route on I-80 E until
- * the Parsippany / I-280 area, then routes down toward Northfield/JCC.
- */
 const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
   {
     id: "camp",
@@ -357,6 +349,7 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
 
 export default function App() {
   const requestIdRef = useRef(0);
+  const leaveAlertTimerRef = useRef<number | null>(null);
 
   const [userPoint, setUserPoint] = useState<Point | null>(null);
   const [busPoint, setBusPoint] = useState<Point | null>(null);
@@ -369,6 +362,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [logoLaunching, setLogoLaunching] = useState(false);
   const [error, setError] = useState("");
+  const [alertStatus, setAlertStatus] = useState("");
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
   );
@@ -394,6 +388,73 @@ export default function App() {
       EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
+
+  function clearLeaveAlert() {
+    if (leaveAlertTimerRef.current !== null) {
+      window.clearTimeout(leaveAlertTimerRef.current);
+      leaveAlertTimerRef.current = null;
+    }
+
+    setAlertStatus("");
+  }
+
+  async function requestNotificationPermission() {
+    if (!("Notification" in window)) {
+      setAlertStatus("Notifications are not available here.");
+      return false;
+    }
+
+    if (Notification.permission === "granted") return true;
+
+    if (Notification.permission === "denied") {
+      setAlertStatus("Notifications are blocked in Safari settings.");
+      return false;
+    }
+
+    const permission = await Notification.requestPermission();
+
+    if (permission !== "granted") {
+      setAlertStatus("Notification permission was not allowed.");
+      return false;
+    }
+
+    return true;
+  }
+
+  async function scheduleLeaveNotification() {
+    if (leaveInMinutes === null) return;
+
+    const canNotify = await requestNotificationPermission();
+    if (!canNotify) return;
+
+    if (leaveAlertTimerRef.current !== null) {
+      window.clearTimeout(leaveAlertTimerRef.current);
+      leaveAlertTimerRef.current = null;
+    }
+
+    const safeLeaveInMinutes = Math.max(0, leaveInMinutes);
+    const delayMs = safeLeaveInMinutes * 60 * 1000;
+
+    setAlertStatus(
+      safeLeaveInMinutes <= 0
+        ? "Leave alert firing now."
+        : `Leave alert set for ${safeLeaveInMinutes} min.`,
+    );
+
+    leaveAlertTimerRef.current = window.setTimeout(() => {
+      new Notification("Leave now", {
+        body: "Deeny bus timing says it’s time to go.",
+        icon: "/logo.png",
+      });
+
+      if ("vibrate" in navigator) {
+        navigator.vibrate?.([400, 180, 400]);
+      }
+
+      leaveAlertTimerRef.current = null;
+      setAlertStatus("Leave alert sent.");
+    }, delayMs);
+  }
 
   async function getUserLocation(): Promise<Point> {
     if (!navigator.geolocation) {
@@ -441,6 +502,7 @@ export default function App() {
 
   function resetBus() {
     requestIdRef.current += 1;
+    clearLeaveAlert();
 
     setBusPoint(null);
     setBusEta(null);
@@ -456,6 +518,8 @@ export default function App() {
       setError("Route is still loading.");
       return;
     }
+
+    clearLeaveAlert();
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
@@ -512,6 +576,12 @@ export default function App() {
 
   useEffect(() => {
     loadFixedRoute();
+
+    return () => {
+      if (leaveAlertTimerRef.current !== null) {
+        window.clearTimeout(leaveAlertTimerRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -734,6 +804,31 @@ export default function App() {
                     ? "Leave now"
                     : `Leave in ${leaveInMinutes} min`}
                 </div>
+
+                {leaveInMinutes !== null && leaveInMinutes > 0 && (
+                  <button
+                    type="button"
+                    className="notifyButton"
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onTouchStart={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onMouseDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      scheduleLeaveNotification();
+                    }}
+                  >
+                    Alert me when to leave
+                  </button>
+                )}
+
+                {alertStatus && <p className="alertStatus">{alertStatus}</p>}
               </>
             )}
           </div>

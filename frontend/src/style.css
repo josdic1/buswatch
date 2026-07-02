@@ -381,6 +381,33 @@ button {
   color: #991b1b;
 }
 
+.notifyButton {
+  width: 100%;
+  margin-top: 0.58rem;
+  border: 0;
+  border-radius: 16px;
+  padding: 0.82rem 1rem;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  font-size: 0.96rem;
+  font-weight: 950;
+  touch-action: manipulation;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.notifyButton:active {
+  transform: scale(0.98);
+}
+
+.alertStatus {
+  margin: 0.55rem 0 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+}
+
 .checkpointTooltip {
   background: rgba(15, 23, 42, 0.9);
   border: 1px solid rgba(148, 163, 184, 0.2);
