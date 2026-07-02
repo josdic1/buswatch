@@ -49,6 +49,14 @@ const JCC_POINT: Point = {
   lng: -74.2916,
 };
 
+/**
+ * Fixed Deeny route.
+ *
+ * Important:
+ * The previous route got off I-80 too early because Rt 10 was used
+ * as an early anchor. This version keeps the route on I-80 E until
+ * the Parsippany / I-280 area, then routes down toward Northfield/JCC.
+ */
 const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
   {
     id: "camp",
@@ -58,41 +66,56 @@ const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
     visible: true,
   },
   {
-    id: "i80",
+    id: "i80-entry",
     label: "I-80 E",
-    point: { lat: 40.8762, lng: -74.6805 },
+    point: { lat: 40.8839, lng: -74.7069 },
     kind: "road",
     visible: true,
-    labelOpacity: 0.78,
+    labelOpacity: 0.82,
   },
   {
-    id: "rt10",
-    label: "Rt 10",
-    point: { lat: 40.8461, lng: -74.4328 },
-    kind: "road",
-    visible: true,
-    labelOpacity: 0.48,
-  },
-  {
-    id: "mtpleasant",
-    label: "Mt Pleasant",
-    point: { lat: 40.8038, lng: -74.3498 },
+    id: "wharton",
+    label: "Wharton",
+    point: { lat: 40.8986, lng: -74.5827 },
     kind: "road",
     visible: false,
   },
   {
-    id: "shrewsbury",
-    label: "Shrewsbury",
-    point: { lat: 40.7874, lng: -74.3208 },
+    id: "rockaway",
+    label: "Rockaway",
+    point: { lat: 40.9004, lng: -74.5128 },
     kind: "road",
     visible: false,
+  },
+  {
+    id: "denville",
+    label: "Denville",
+    point: { lat: 40.8881, lng: -74.4708 },
+    kind: "road",
+    visible: false,
+  },
+  {
+    id: "parsippany",
+    label: "Parsippany",
+    point: { lat: 40.8637, lng: -74.3927 },
+    kind: "road",
+    visible: false,
+  },
+  {
+    id: "i280",
+    label: "I-280 E",
+    point: { lat: 40.8458, lng: -74.3498 },
+    kind: "road",
+    visible: true,
+    labelOpacity: 0.46,
   },
   {
     id: "northfield",
     label: "Northfield",
-    point: { lat: 40.7754, lng: -74.2989 },
+    point: { lat: 40.7808, lng: -74.2944 },
     kind: "road",
-    visible: false,
+    visible: true,
+    labelOpacity: 0.22,
   },
   {
     id: "jcc",
@@ -241,7 +264,7 @@ function FitEverythingInView({
   const map = useMap();
 
   useEffect(() => {
-    const points: Point[] = [SOUTH_ORANGE_POINT, CAMP_POINT, JCC_POINT];
+    const points: Point[] = [CAMP_POINT, JCC_POINT];
 
     if (plannedRoute.length > 0) {
       points.push(...plannedRoute);
@@ -519,7 +542,7 @@ export default function App() {
         >
           <TileLayer
             attribution="&copy; OpenStreetMap contributors &copy; CARTO"
-            url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
           />
 
           <TapBusHandler enabled={!routeLoading} onTapBus={handleTapBus} />
@@ -536,9 +559,9 @@ export default function App() {
               <Polyline
                 positions={plannedRoute.map((point) => [point.lat, point.lng])}
                 pathOptions={{
-                  color: "#020617",
-                  weight: 15,
-                  opacity: 0.72,
+                  color: "#1e1b4b",
+                  weight: 11,
+                  opacity: 0.88,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -547,9 +570,9 @@ export default function App() {
               <Polyline
                 positions={plannedRoute.map((point) => [point.lat, point.lng])}
                 pathOptions={{
-                  color: "#5eead4",
-                  weight: 5,
-                  opacity: 0.86,
+                  color: "#4338ca",
+                  weight: 6,
+                  opacity: 0.96,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
