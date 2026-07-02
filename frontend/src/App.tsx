@@ -200,31 +200,11 @@ function snapPointToRoute(target: Point, routePoints: Point[]) {
 }
 
 function formatCountdown(totalSeconds: number) {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
+  const safeSeconds = Math.max(0, totalSeconds);
+  const minutes = Math.floor(safeSeconds / 60);
+  const seconds = safeSeconds % 60;
+
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function AppLogo({
-  loading,
-  launching,
-}: {
-  loading: boolean;
-  launching: boolean;
-}) {
-  const className = [
-    "logoBox",
-    loading ? "loading" : "",
-    launching ? "launching" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return (
-    <div className={className}>
-      <img src="/logo.png" alt="Deeny WhereUAt" className="appLogo" />
-    </div>
-  );
 }
 
 function TapBusHandler({
@@ -265,7 +245,6 @@ function FitEverythingInView({
   const lastFitVersionRef = useRef(-1);
 
   useEffect(() => {
-    // Only refit when explicitly asked. Never fight the user's fingers.
     if (fitVersion === lastFitVersionRef.current) return;
     lastFitVersionRef.current = fitVersion;
 
@@ -293,7 +272,7 @@ function FitEverythingInView({
 
     map.fitBounds(bounds, {
       paddingTopLeft: [34, 34],
-      paddingBottomRight: [34, 330],
+      paddingBottomRight: [34, 275],
       maxZoom: 10,
       animate: true,
     });
@@ -361,14 +340,11 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
 
 export default function App() {
   const requestIdRef = useRef(0);
-
-  // Alarm machinery. No magic:
-  // - audioContextRef: created + resumed on the button tap (iOS requires a user gesture)
-  // - sirenStopRef: function that kills the siren + vibration loop
-  // - wakeLockRef: keeps the screen on while the alarm is armed
   const audioContextRef = useRef<AudioContext | null>(null);
   const sirenStopRef = useRef<(() => void) | null>(null);
-  const wakeLockRef = useRef<any>(null);
+  const wakeLockRef = useRef<{ release?: () => Promise<void> | void } | null>(
+    null,
+  );
 
   const [userPoint, setUserPoint] = useState<Point | null>(null);
   const [busPoint, setBusPoint] = useState<Point | null>(null);
@@ -379,7 +355,6 @@ export default function App() {
 
   const [routeLoading, setRouteLoading] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [logoLaunching, setLogoLaunching] = useState(false);
   const [error, setError] = useState("");
   const [alertStatus, setAlertStatus] = useState("");
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
@@ -387,7 +362,6 @@ export default function App() {
   );
   const [fitVersion, setFitVersion] = useState(0);
 
-  // Alarm state: target timestamp, live countdown, and whether it's ringing
   const [alarmTargetMs, setAlarmTargetMs] = useState<number | null>(null);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [alarmFiring, setAlarmFiring] = useState(false);
@@ -412,25 +386,24 @@ export default function App() {
     );
   }, [busEta, userEta]);
 
+  const alarmArmed = alarmTargetMs !== null && secondsLeft !== null;
+
   function refitMap() {
     setFitVersion((version) => version + 1);
   }
 
-  // ---------- Alarm: audio ----------
-
   function unlockAudio() {
     if (!audioContextRef.current) {
-      const Ctx =
+      const AudioContextConstructor =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext?: typeof AudioContext })
           .webkitAudioContext;
 
-      if (!Ctx) return;
+      if (!AudioContextConstructor) return;
 
-      audioContextRef.current = new Ctx();
+      audioContextRef.current = new AudioContextConstructor();
     }
 
-    // resume() inside a tap handler is what unlocks audio on iOS
     audioContextRef.current.resume();
   }
 
@@ -440,8 +413,8 @@ export default function App() {
 
     ctx.resume();
 
-    const CHIME_COUNT = 4; // how many times it dings
-    const CHIME_GAP_MS = 1600; // pause between dings
+    const chimeCount = 4;
+    const chimeGapMs = 1600;
 
     let stopped = false;
 
@@ -450,7 +423,6 @@ export default function App() {
 
       const now = ctx.currentTime;
 
-      // Two soft notes: E5 then C5, like a doorbell
       const notes = [
         { freq: 659.25, start: 0 },
         { freq: 523.25, start: 0.28 },
@@ -463,7 +435,6 @@ export default function App() {
         osc.type = "sine";
         osc.frequency.value = note.freq;
 
-        // Fade in fast, fade out slow = soft "ding" instead of a blast
         gain.gain.setValueAtTime(0, now + note.start);
         gain.gain.linearRampToValueAtTime(0.22, now + note.start + 0.03);
         gain.gain.exponentialRampToValueAtTime(0.001, now + note.start + 0.9);
@@ -476,13 +447,13 @@ export default function App() {
       });
     }
 
-    // One gentle buzz per chime, not a jackhammer
     navigator.vibrate?.(200);
     playChime();
 
     let chimesPlayed = 1;
+
     const chimeTimer = window.setInterval(() => {
-      if (chimesPlayed >= CHIME_COUNT) {
+      if (chimesPlayed >= chimeCount) {
         window.clearInterval(chimeTimer);
         return;
       }
@@ -490,7 +461,7 @@ export default function App() {
       chimesPlayed += 1;
       navigator.vibrate?.(200);
       playChime();
-    }, CHIME_GAP_MS);
+    }, chimeGapMs);
 
     return () => {
       stopped = true;
@@ -499,17 +470,23 @@ export default function App() {
     };
   }
 
-  // ---------- Alarm: wake lock ----------
-
   async function requestWakeLock() {
     try {
-      const wakeLockApi = (navigator as any).wakeLock;
+      const wakeLockApi = (
+        navigator as Navigator & {
+          wakeLock?: {
+            request: (
+              type: "screen",
+            ) => Promise<{ release?: () => Promise<void> | void }>;
+          };
+        }
+      ).wakeLock;
+
       if (!wakeLockApi) return;
 
       wakeLockRef.current = await wakeLockApi.request("screen");
     } catch {
-      // Wake lock denied (low battery mode, etc). Alarm still works
-      // as long as the screen stays on.
+      // Ignore. Alarm still works while the screen stays awake.
     }
   }
 
@@ -520,8 +497,6 @@ export default function App() {
     }
   }
 
-  // ---------- Alarm: lifecycle ----------
-
   function fireAlarm() {
     setAlarmFiring(true);
     setAlertStatus("");
@@ -529,17 +504,13 @@ export default function App() {
     sirenStopRef.current?.();
     sirenStopRef.current = startSiren();
 
-    // Best-effort notification. On iOS Safari this usually won't show
-    // unless the app is installed to the home screen — the siren and
-    // overlay are the real alarm.
     if ("Notification" in window && Notification.permission === "granted") {
       try {
         new Notification("Leave now", {
           body: "Deeny bus timing says it’s time to go.",
-          icon: "/logo.png",
         });
       } catch {
-        // fine, overlay + siren carry it
+        // Overlay and sound still handle the alarm.
       }
     }
   }
@@ -562,10 +533,8 @@ export default function App() {
   function setLeaveAlarm() {
     if (leaveInMinutes === null) return;
 
-    // This runs inside the tap = our one chance to unlock audio on iOS
     unlockAudio();
 
-    // Ask for notification permission as a bonus, don't block on it
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission().catch(() => {});
     }
@@ -578,58 +547,13 @@ export default function App() {
     }
 
     requestWakeLock();
-    setAlarmTargetMs(Date.now() + safeLeaveInMinutes * 60 * 1000);
+
+    const targetMs = Date.now() + safeLeaveInMinutes * 60 * 1000;
+
+    setAlarmTargetMs(targetMs);
+    setSecondsLeft(safeLeaveInMinutes * 60);
     setAlertStatus("Keep the app open — screen will stay awake.");
   }
-
-  // Countdown ticker. Computes from Date.now() every tick, so even if
-  // iOS throttles the interval, the remaining time is always correct.
-  useEffect(() => {
-    if (alarmTargetMs === null) return;
-
-    let fired = false;
-
-    const tick = () => {
-      const remaining = Math.ceil((alarmTargetMs - Date.now()) / 1000);
-
-      if (remaining <= 0) {
-        if (!fired) {
-          fired = true;
-          setSecondsLeft(0);
-          setAlarmTargetMs(null);
-          fireAlarm();
-        }
-        return;
-      }
-
-      setSecondsLeft(remaining);
-    };
-
-    tick();
-    const interval = window.setInterval(tick, 250);
-
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [alarmTargetMs]);
-
-  // iOS drops the wake lock when you background the tab. Re-grab it
-  // when the user comes back and the alarm is still armed.
-  useEffect(() => {
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible" && alarmTargetMs !== null) {
-        requestWakeLock();
-      }
-    };
-
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [alarmTargetMs]);
-
-  // ---------- Existing app logic ----------
 
   async function getUserLocation(): Promise<Point> {
     if (!navigator.geolocation) {
@@ -688,7 +612,6 @@ export default function App() {
     setBusRouteStartIndex(null);
     setError("");
     setLoading(false);
-    setLogoLaunching(false);
     refitMap();
   }
 
@@ -702,20 +625,6 @@ export default function App() {
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-
-    setLogoLaunching(false);
-
-    window.setTimeout(() => {
-      if (requestIdRef.current === requestId) {
-        setLogoLaunching(true);
-      }
-    }, 20);
-
-    window.setTimeout(() => {
-      if (requestIdRef.current === requestId) {
-        setLogoLaunching(false);
-      }
-    }, 1250);
 
     const snapped = snapPointToRoute(clickedPoint, plannedRoute);
 
@@ -763,7 +672,50 @@ export default function App() {
     };
   }, []);
 
-  const alarmArmed = alarmTargetMs !== null && secondsLeft !== null;
+  useEffect(() => {
+    if (alarmTargetMs === null) return;
+
+    let fired = false;
+
+    const tick = () => {
+      const remaining = Math.ceil((alarmTargetMs - Date.now()) / 1000);
+
+      if (remaining <= 0) {
+        if (!fired) {
+          fired = true;
+          setSecondsLeft(0);
+          setAlarmTargetMs(null);
+          fireAlarm();
+        }
+
+        return;
+      }
+
+      setSecondsLeft(remaining);
+    };
+
+    tick();
+
+    const interval = window.setInterval(tick, 250);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [alarmTargetMs]);
+
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible" && alarmTargetMs !== null) {
+        requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [alarmTargetMs]);
 
   return (
     <main className="app">
@@ -915,8 +867,6 @@ export default function App() {
           </button>
         </div>
 
-        <AppLogo loading={loading} launching={logoLaunching} />
-
         <div className={busPoint ? "statusCard" : "statusCard waiting"}>
           <div className="statusContent">
             {error && (
@@ -1009,32 +959,32 @@ export default function App() {
 
                 {alarmArmed && (
                   <div className="alertCountdown">
-                    <span>Alarm in</span>
-                    <strong>{formatCountdown(secondsLeft)}</strong>
-                  </div>
-                )}
+                    <div className="alertCountdownInfo">
+                      <span>Alarm in</span>
+                      <strong>{formatCountdown(secondsLeft)}</strong>
+                    </div>
 
-                {alarmArmed && (
-                  <button
-                    type="button"
-                    className="cancelAlertButton"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onTouchStart={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onMouseDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      cancelAlarm();
-                    }}
-                  >
-                    Cancel
-                  </button>
+                    <button
+                      type="button"
+                      className="cancelAlertButton"
+                      onPointerDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onTouchStart={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onMouseDown={(event) => {
+                        event.stopPropagation();
+                      }}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        cancelAlarm();
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 )}
 
                 {alertStatus && <p className="alertStatus">{alertStatus}</p>}
@@ -1046,14 +996,15 @@ export default function App() {
 
       {alarmFiring && (
         <div className="alarmOverlay">
-          <div className="alarmOverlayInner">
-            <p className="alarmEmoji">🚌</p>
-            <p className="alarmTitle">Leave now</p>
-            <p className="alarmSub">Tsadie bus timing says it’s time to go.</p>
+          <div className="alarmCard">
+            <div className="alarmPulse" />
+            <p className="alarmKicker">Deeny Bus</p>
+            <div className="alarmTitle">Leave now</div>
+            <p className="alarmSub">It’s time to go.</p>
 
             <button
               type="button"
-              className="alarmDismiss"
+              className="stopAlarmButton"
               onClick={dismissAlarm}
             >
               I’m going
