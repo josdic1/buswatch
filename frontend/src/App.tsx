@@ -10,7 +10,7 @@ import {
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 
-const API_URL = "http://localhost:3001";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 type Point = {
   lat: number;
@@ -144,10 +144,9 @@ function FitEverythingInView({
       points.push(userPoint);
     }
 
-    const bounds = points.map((point) => [
-      point.lat,
-      point.lng,
-    ] as [number, number]);
+    const bounds = points.map(
+      (point) => [point.lat, point.lng] as [number, number],
+    );
 
     map.fitBounds(bounds, {
       paddingTopLeft: [36, 36],
@@ -176,9 +175,7 @@ export default function App() {
     if (!busEta || !userEta) return null;
 
     return (
-      busEta.durationMinutes -
-      userEta.durationMinutes -
-      EXTRA_CUSHION_MINUTES
+      busEta.durationMinutes - userEta.durationMinutes - EXTRA_CUSHION_MINUTES
     );
   }, [busEta, userEta]);
 
@@ -197,7 +194,9 @@ export default function App() {
         },
         () => {
           reject(
-            new Error("Location blocked. Allow location and tap the bus again."),
+            new Error(
+              "Location blocked. Allow location and tap the bus again.",
+            ),
           );
         },
         {
