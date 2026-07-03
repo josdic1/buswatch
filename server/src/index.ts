@@ -431,38 +431,70 @@ app.post("/push/schedule-leave", async (req, res) => {
     return;
   }
 
-  const scheduleId = crypto.randomUUID();
-  const sendAt = new Date(Date.now() + Math.round(delaySeconds * 1000));
+  const reminderPlan = [
+    {
+      offsetSeconds: 0,
+      title: "Leave now",
+      body: "Tsadie says it’s time to go.",
+      tag: "tsadie-leave-now-1",
+    },
+    {
+      offsetSeconds: 45,
+      title: "Still time to leave",
+      body: "Second reminder: head out now.",
+      tag: "tsadie-leave-now-2",
+    },
+    {
+      offsetSeconds: 90,
+      title: "Final reminder",
+      body: "Last Tsadie reminder. Go now.",
+      tag: "tsadie-leave-now-3",
+    },
+  ];
 
-  await pool.query(
-    `
-      INSERT INTO scheduled_pushes (
-        id,
+  const scheduled = reminderPlan.map((reminder) => ({
+    id: crypto.randomUUID(),
+    sendAt: new Date(
+      Date.now() + Math.round((delaySeconds + reminder.offsetSeconds) * 1000),
+    ),
+    ...reminder,
+  }));
+
+  for (const reminder of scheduled) {
+    await pool.query(
+      `
+        INSERT INTO scheduled_pushes (
+          id,
+          endpoint,
+          title,
+          body,
+          url,
+          tag,
+          send_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7);
+      `,
+      [
+        reminder.id,
         endpoint,
-        title,
-        body,
-        url,
-        tag,
-        send_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7);
-    `,
-    [
-      scheduleId,
-      endpoint,
-      "Leave now",
-      "Tsadie says it’s time to go.",
-      "/",
-      "tsadie-leave-now",
-      sendAt,
-    ],
-  );
+        reminder.title,
+        reminder.body,
+        "/",
+        reminder.tag,
+        reminder.sendAt,
+      ],
+    );
+  }
 
   res.json({
     ok: true,
-    scheduleId,
+    scheduleIds: scheduled.map((reminder) => reminder.id),
     delaySeconds: Math.round(delaySeconds),
-    sendAt: sendAt.toISOString(),
+    reminders: scheduled.map((reminder) => ({
+      id: reminder.id,
+      title: reminder.title,
+      sendAt: reminder.sendAt.toISOString(),
+    })),
   });
 });
 

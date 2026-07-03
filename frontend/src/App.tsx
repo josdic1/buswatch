@@ -375,7 +375,7 @@ export default function App() {
   const [alertStatus, setAlertStatus] = useState("");
   const [pushStatus, setPushStatus] = useState("");
   const [pushEndpoint, setPushEndpoint] = useState<string | null>(null);
-  const [scheduledPushId, setScheduledPushId] = useState<string | null>(null);
+  const [scheduledPushIds, setScheduledPushIds] = useState<string[]>([]);
 
   const [busRouteStartIndex, setBusRouteStartIndex] = useState<number | null>(
     null,
@@ -661,27 +661,34 @@ export default function App() {
 
       const data = await res.json();
 
-      setScheduledPushId(String(data.scheduleId || ""));
-      setPushStatus("Push alert scheduled.");
+      const nextScheduleIds = Array.isArray(data.scheduleIds)
+        ? data.scheduleIds.map(String)
+        : [];
+
+      setScheduledPushIds(nextScheduleIds);
+      setPushStatus(
+        "Push alerts scheduled: leave now, second reminder, final reminder.",
+      );
     } catch {
       setPushStatus("Push unavailable. In-app alert is still running.");
     }
   }
 
   async function cancelScheduledPushAlert() {
-    if (!scheduledPushId) return;
+    if (scheduledPushIds.length === 0) return;
 
     try {
-      await fetch(
-        `${API_URL}/push/schedule/${encodeURIComponent(scheduledPushId)}`,
-        {
-          method: "DELETE",
-        },
+      await Promise.all(
+        scheduledPushIds.map((scheduleId) =>
+          fetch(`${API_URL}/push/schedule/${encodeURIComponent(scheduleId)}`, {
+            method: "DELETE",
+          }),
+        ),
       );
     } catch {
       // In-app alarm cancel still works.
     } finally {
-      setScheduledPushId(null);
+      setScheduledPushIds([]);
     }
   }
 

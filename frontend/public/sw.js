@@ -19,6 +19,9 @@ self.addEventListener("push", (event) => {
       body,
       tag,
       requireInteraction: true,
+      renotify: true,
+      silent: false,
+      vibrate: [200, 100, 200, 100, 400],
       data: {
         url,
       },
