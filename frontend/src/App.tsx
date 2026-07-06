@@ -408,12 +408,6 @@ export default function App() {
     );
   }, [busEta, userEta]);
 
-  const backupTimerMinutes = useMemo(() => {
-    if (leaveInMinutes === null) return null;
-
-    return Math.max(1, Math.floor(leaveInMinutes));
-  }, [leaveInMinutes]);
-
   const alarmArmed = alarmTargetMs !== null && secondsLeft !== null;
 
   function refitMap() {
@@ -631,7 +625,7 @@ export default function App() {
     const endpoint = String(data.endpoint || subscription.endpoint);
 
     setPushEndpoint(endpoint);
-    setPushStatus("Push notifications enabled.");
+    setPushStatus("Notifications enabled.");
 
     return endpoint;
   }
@@ -667,7 +661,7 @@ export default function App() {
 
       setScheduledPushIds(nextScheduleIds);
       setPushStatus(
-        "Push alerts scheduled: leave now, second reminder, final reminder.",
+        "3 reminders scheduled. You can use other apps. Make sure notification sounds are on.",
       );
     } catch {
       setPushStatus("Push unavailable. In-app alert is still running.");
@@ -717,7 +711,7 @@ export default function App() {
 
     setAlarmTargetMs(targetMs);
     setSecondsLeft(delaySeconds);
-    setAlertStatus("Countdown live. Push alert scheduled when available.");
+    setAlertStatus("Leave-time reminders are being scheduled.");
 
     await schedulePushLeaveAlert(delaySeconds);
   }
@@ -1123,7 +1117,7 @@ export default function App() {
                   Tap where the bus is on the highlighted route.
                 </p>
                 <p className="helperText">
-                  In-app alert now. Push notifications available when installed.
+                  Tsadie calculates when you should leave.
                 </p>
               </>
             )}
@@ -1189,29 +1183,21 @@ export default function App() {
                           setAlertWarningOpen(true);
                         }}
                       >
-                        Set alert
+                        Set 3 reminders
                       </button>
 
                       <p className="miniNotice">
-                        In-app alert now. Push notifications available when
-                        installed.
+                        Tsadie will remind you when it is time to leave.
                       </p>
-
-                      {backupTimerMinutes !== null && (
-                        <p className="backupNotice">
-                          Foolproof backup: set an iPhone timer for{" "}
-                          <strong>{backupTimerMinutes} min</strong>.
-                        </p>
-                      )}
                     </>
                   )}
 
                 {alarmArmed && (
                   <div className="keepOpenBanner">
-                    <strong>Countdown live</strong>
+                    <strong>3 reminders scheduled</strong>
                     <span>
-                      You can use your phone, but return to Tsadie before the
-                      timer reaches zero. Push will fire if enabled.
+                      You can use other apps. Make sure notification sounds are
+                      on.
                     </span>
                   </div>
                 )}
@@ -1221,13 +1207,6 @@ export default function App() {
                     <span>Alert in</span>
                     <strong>{formatCountdown(secondsLeft ?? 0)}</strong>
                   </div>
-                )}
-
-                {alarmArmed && backupTimerMinutes !== null && (
-                  <p className="backupNotice active">
-                    Foolproof backup: set an iPhone timer for{" "}
-                    <strong>{backupTimerMinutes} min</strong>.
-                  </p>
                 )}
 
                 {alarmArmed && (
@@ -1249,7 +1228,7 @@ export default function App() {
                       cancelAlarm();
                     }}
                   >
-                    Cancel
+                    Cancel reminders
                   </button>
                 )}
 
@@ -1269,32 +1248,43 @@ export default function App() {
           aria-labelledby="alert-info-title"
         >
           <div className="alertInfoModal">
-            <p className="alertInfoKicker">Alert</p>
-            <h2 id="alert-info-title">Tsadie keeps time</h2>
+            <p className="alertInfoKicker">Leave-time reminders</p>
+            <h2 id="alert-info-title">Tsadie will remind you</h2>
+
+            <div className="sampleNotification">
+              <div className="sampleNotificationTop">
+                <span className="sampleAppIcon">🚌</span>
+
+                <div className="sampleNotificationCopy">
+                  <div className="sampleNotificationTitleRow">
+                    <span className="sampleNotificationTitle">Leave now</span>
+                    <span className="sampleTime">now</span>
+                  </div>
+
+                  <div className="sampleNotificationSource">from TSADIE</div>
+
+                  <div className="sampleNotificationBody">
+                    Tsadie says it’s time to go.
+                  </div>
+                </div>
+              </div>
+            </div>
 
             <p className="alertInfoText">
-              Tsadie runs an in-app countdown now. If notifications are allowed,
-              Tsadie also schedules a push alert.
+              Tsadie will send 3 leave-time reminders based on the bus ETA.
             </p>
 
             <div className="alertRules">
-              <div>Best setup: add Tsadie to your iPhone Home Screen.</div>
               <div>Allow notifications when asked.</div>
-              <div>You can use your phone while waiting.</div>
-              <div>Keep the iPhone timer backup for absolute safety.</div>
+              <div>You can use other apps after setting the alert.</div>
+              <div>Make sure notification sounds are on.</div>
+              <div>
+                Tsadie sends: leave now, second reminder, final reminder.
+              </div>
             </div>
 
-            {backupTimerMinutes !== null && (
-              <div className="foolproofBox">
-                <span>Foolproof backup</span>
-                <strong>
-                  Set an iPhone timer for {backupTimerMinutes} min
-                </strong>
-              </div>
-            )}
-
             <p className="alertSoon">
-              Push notifications available when installed.
+              Notifications follow your phone’s sound and Focus settings.
             </p>
 
             <button
@@ -1304,7 +1294,7 @@ export default function App() {
                 void setLeaveAlarm();
               }}
             >
-              Set alert
+              Set 3 reminders
             </button>
 
             <button
@@ -1314,7 +1304,7 @@ export default function App() {
                 setAlertWarningOpen(false);
               }}
             >
-              Cancel
+              Not now
             </button>
           </div>
         </div>
@@ -1331,7 +1321,7 @@ export default function App() {
             <div className="helpHeader">
               <div>
                 <p className="helpKicker">Tsadie Help</p>
-                <h2 id="help-title">Setup steps</h2>
+                <h2 id="help-title">How Tsadie works</h2>
               </div>
 
               <button
@@ -1347,44 +1337,50 @@ export default function App() {
             </div>
 
             <div className="helpSection">
-              <h3>Allow location</h3>
+              <h3>Use Tsadie</h3>
               <ol>
-                <li>Open the iPhone Settings app.</li>
-                <li>Tap Privacy &amp; Security.</li>
-                <li>Tap Location Services.</li>
-                <li>Make sure Location Services is ON.</li>
-                <li>Scroll down and tap Safari Websites.</li>
-                <li>Choose While Using the App.</li>
-                <li>Come back to Tsadie and tap the bus route again.</li>
+                <li>Open Tsadie.</li>
+                <li>Tap where the bus is on the highlighted route.</li>
+                <li>Tsadie calculates when you should leave.</li>
+                <li>Tap Set 3 reminders.</li>
+                <li>Allow notifications when asked.</li>
+              </ol>
+            </div>
+
+            <div className="helpSection">
+              <h3>Reminders</h3>
+              <ol>
+                <li>Tsadie sends 3 leave-time reminders.</li>
+                <li>You can use other apps after setting the alert.</li>
+                <li>Make sure notification sounds are on.</li>
+                <li>
+                  Focus, Silent Mode, and phone settings can affect sound.
+                </li>
               </ol>
 
               <p className="helpNote">
-                If Tsadie appears as its own app in Settings, tap Tsadie, then
-                tap Location, then choose While Using the App.
+                Tsadie reminders are notifications, not a forced phone alarm.
               </p>
             </div>
 
             <div className="helpSection">
               <h3>Add Tsadie to the Home Screen</h3>
               <ol>
-                <li>Open Safari on the iPhone.</li>
-                <li>Go to the Tsadie website.</li>
-                <li>
-                  Tap the Share button. It looks like a square with an arrow.
-                </li>
-                <li>Scroll down and tap Add to Home Screen.</li>
-                <li>Tap Add.</li>
-                <li>Use the Tsadie icon on the Home Screen like an app.</li>
+                <li>Open Tsadie in Safari.</li>
+                <li>Tap the Share button.</li>
+                <li>Tap Add to Home Screen.</li>
+                <li>Open Tsadie from the Home Screen icon.</li>
               </ol>
             </div>
 
             <div className="helpSection">
-              <h3>About alerts</h3>
+              <h3>Allow location</h3>
               <ol>
-                <li>In-app alerts work while Tsadie is open and running.</li>
-                <li>Push alerts work after notifications are allowed.</li>
-                <li>For iPhone, add Tsadie to the Home Screen first.</li>
-                <li>Use the iPhone timer backup if the timing is critical.</li>
+                <li>Open iPhone Settings.</li>
+                <li>Tap Privacy &amp; Security.</li>
+                <li>Tap Location Services.</li>
+                <li>Make sure Location Services is ON.</li>
+                <li>Allow location for Safari Websites or Tsadie.</li>
               </ol>
             </div>
 
