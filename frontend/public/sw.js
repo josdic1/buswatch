@@ -12,7 +12,7 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Tsadie";
   const body = data.body || "Time to check the bus.";
   const url = data.url || "/";
-  const tag = data.tag || "tsadie-alert";
+  const tag = data.tag || `tsadie-alert-${Date.now()}`;
 
   event.waitUntil(
     self.registration.showNotification(title, {
