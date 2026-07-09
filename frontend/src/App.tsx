@@ -203,16 +203,15 @@ function FitEverythingInView({
 function CheckpointMarker({ waypoint }: { waypoint: RouteWaypoint }) {
   const isRoad = waypoint.kind === "road";
 
-  // camp/jcc = the two ends, biggest, always labeled.
-  // highway/exit = the two big road changes + the exit, always labeled.
-  // road = the 5 towns along I-80 -- small quiet dots, label only on tap,
-  // so they don't pile up into a wall of text when they're close together.
+  // camp/jcc = the two ends, biggest. highway/exit = where the road changes,
+  // still big and obvious since these are the real tap-reference points.
+  // road = minor street transitions near the very end, smaller.
   const radius =
     waypoint.kind === "camp" || waypoint.kind === "jcc"
       ? 10
       : waypoint.kind === "highway" || waypoint.kind === "exit"
         ? 8
-        : 4;
+        : 5;
 
   const pathOptions =
     waypoint.kind === "camp"
@@ -248,12 +247,16 @@ function CheckpointMarker({ waypoint }: { waypoint: RouteWaypoint }) {
                 weight: 3,
               }
             : {
-                color: "#312e81",
-                fillColor: "#a5b4fc",
-                fillOpacity: 0.9,
+                color: "#5eead4",
+                fillColor: "#5eead4",
+                fillOpacity: 0.85,
                 opacity: 0.9,
                 weight: 2,
               };
+
+  const tooltipClassName = isRoad
+    ? "checkpointTooltip roadTooltip"
+    : "checkpointTooltip";
 
   return (
     <CircleMarker
@@ -262,11 +265,11 @@ function CheckpointMarker({ waypoint }: { waypoint: RouteWaypoint }) {
       pathOptions={pathOptions}
     >
       <Tooltip
-        permanent={!isRoad}
+        permanent
         direction="top"
-        offset={[0, isRoad ? -6 : -12]}
+        offset={[0, isRoad ? -8 : -12]}
         opacity={1}
-        className="checkpointTooltip"
+        className={tooltipClassName}
       >
         {waypoint.label}
       </Tooltip>
