@@ -9,6 +9,11 @@ import {
 } from "react-leaflet";
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  STATIC_ROUTE_POINTS,
+  STATIC_ROUTE_WAYPOINTS,
+  type RouteWaypoint,
+} from "./routeStatic";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
@@ -25,15 +30,6 @@ type EtaResult = {
   routePoints: Point[];
 };
 
-type RouteCheckpoint = {
-  id: string;
-  label: string;
-  point: Point;
-  kind: "camp" | "road" | "jcc";
-  visible?: boolean;
-  labelOpacity?: number;
-};
-
 const SOUTH_ORANGE_POINT: Point = {
   lat: 40.7489,
   lng: -74.2613,
@@ -48,75 +44,6 @@ const JCC_POINT: Point = {
   lat: 40.7697,
   lng: -74.2916,
 };
-
-const ROUTE_CHECKPOINTS: RouteCheckpoint[] = [
-  {
-    id: "camp",
-    label: "Camp",
-    point: CAMP_POINT,
-    kind: "camp",
-    visible: true,
-  },
-  {
-    id: "i80-entry",
-    label: "I-80 E",
-    point: { lat: 40.8839, lng: -74.7069 },
-    kind: "road",
-    visible: true,
-    labelOpacity: 0.82,
-  },
-  {
-    id: "wharton",
-    label: "Wharton",
-    point: { lat: 40.8986, lng: -74.5827 },
-    kind: "road",
-    visible: false,
-  },
-  {
-    id: "rockaway",
-    label: "Rockaway",
-    point: { lat: 40.9004, lng: -74.5128 },
-    kind: "road",
-    visible: false,
-  },
-  {
-    id: "denville",
-    label: "Denville",
-    point: { lat: 40.8881, lng: -74.4708 },
-    kind: "road",
-    visible: false,
-  },
-  {
-    id: "parsippany",
-    label: "Parsippany",
-    point: { lat: 40.8637, lng: -74.3927 },
-    kind: "road",
-    visible: false,
-  },
-  {
-    id: "i280",
-    label: "I-280 E",
-    point: { lat: 40.8458, lng: -74.3498 },
-    kind: "road",
-    visible: true,
-    labelOpacity: 0.46,
-  },
-  {
-    id: "northfield",
-    label: "Northfield",
-    point: { lat: 40.7808, lng: -74.2944 },
-    kind: "road",
-    visible: true,
-    labelOpacity: 0.22,
-  },
-  {
-    id: "jcc",
-    label: "JCC",
-    point: JCC_POINT,
-    kind: "jcc",
-    visible: true,
-  },
-];
 
 const DEFAULT_CENTER: LatLngExpression = [
   SOUTH_ORANGE_POINT.lat,
@@ -161,30 +88,6 @@ async function fetchEta(from: Point, to: Point): Promise<EtaResult> {
   }
 
   return res.json();
-}
-
-async function fetchFixedRoute(points: Point[]): Promise<Point[]> {
-  const segments = await Promise.all(
-    points.slice(0, -1).map((startPoint, index) => {
-      const endPoint = points[index + 1];
-      return fetchEta(startPoint, endPoint);
-    }),
-  );
-
-  const merged: Point[] = [];
-
-  segments.forEach((segment, index) => {
-    if (segment.routePoints.length === 0) return;
-
-    if (index === 0) {
-      merged.push(...segment.routePoints);
-      return;
-    }
-
-    merged.push(...segment.routePoints.slice(1));
-  });
-
-  return merged;
 }
 
 function pointDistanceSquared(a: Point, b: Point) {
@@ -297,17 +200,21 @@ function FitEverythingInView({
   return null;
 }
 
-function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
-  if (!checkpoint.visible) return null;
+function CheckpointMarker({ waypoint }: { waypoint: RouteWaypoint }) {
+  const isRoad = waypoint.kind === "road";
 
-  const isRoad = checkpoint.kind === "road";
-  const labelOpacity = checkpoint.labelOpacity ?? 1;
-
+  // camp/jcc = the two ends, biggest. highway/exit = where the road changes,
+  // still big and obvious since these are the real tap-reference points.
+  // road = minor street transitions near the very end, smaller.
   const radius =
-    checkpoint.kind === "camp" ? 9 : checkpoint.kind === "jcc" ? 10 : 4;
+    waypoint.kind === "camp" || waypoint.kind === "jcc"
+      ? 10
+      : waypoint.kind === "highway" || waypoint.kind === "exit"
+        ? 8
+        : 5;
 
   const pathOptions =
-    checkpoint.kind === "camp"
+    waypoint.kind === "camp"
       ? {
           color: "#f97316",
           fillColor: "#fed7aa",
@@ -315,7 +222,7 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
           opacity: 1,
           weight: 3,
         }
-      : checkpoint.kind === "jcc"
+      : waypoint.kind === "jcc"
         ? {
             color: "#f8fafc",
             fillColor: "#0f172a",
@@ -323,13 +230,29 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
             opacity: 1,
             weight: 4,
           }
-        : {
-            color: "#5eead4",
-            fillColor: "#5eead4",
-            fillOpacity: 0.6 * labelOpacity,
-            opacity: 0.5 * labelOpacity,
-            weight: 1,
-          };
+        : waypoint.kind === "highway"
+          ? {
+              color: "#4338ca",
+              fillColor: "#c7d2fe",
+              fillOpacity: 1,
+              opacity: 1,
+              weight: 3,
+            }
+          : waypoint.kind === "exit"
+            ? {
+                color: "#b45309",
+                fillColor: "#fde68a",
+                fillOpacity: 1,
+                opacity: 1,
+                weight: 3,
+              }
+            : {
+                color: "#5eead4",
+                fillColor: "#5eead4",
+                fillOpacity: 0.85,
+                opacity: 0.9,
+                weight: 2,
+              };
 
   const tooltipClassName = isRoad
     ? "checkpointTooltip roadTooltip"
@@ -337,18 +260,18 @@ function CheckpointMarker({ checkpoint }: { checkpoint: RouteCheckpoint }) {
 
   return (
     <CircleMarker
-      center={[checkpoint.point.lat, checkpoint.point.lng]}
+      center={[waypoint.point.lat, waypoint.point.lng]}
       radius={radius}
       pathOptions={pathOptions}
     >
       <Tooltip
         permanent
         direction="top"
-        offset={[0, isRoad ? -6 : -10]}
-        opacity={isRoad ? labelOpacity : 1}
+        offset={[0, isRoad ? -8 : -12]}
+        opacity={1}
         className={tooltipClassName}
       >
-        {checkpoint.label}
+        {waypoint.label}
       </Tooltip>
     </CircleMarker>
   );
@@ -745,22 +668,13 @@ export default function App() {
     });
   }
 
-  async function loadFixedRoute() {
-    setRouteLoading(true);
-
-    try {
-      const route = await fetchFixedRoute(
-        ROUTE_CHECKPOINTS.map((checkpoint) => checkpoint.point),
-      );
-
-      setPlannedRoute(route);
-      setError("");
-      refitMap();
-    } catch {
-      setError("Could not load the Deeny route.");
-    } finally {
-      setRouteLoading(false);
-    }
+  function loadFixedRoute() {
+    // Static, baked-in route: the bus drives the same roads every day, so
+    // there's nothing to fetch or recalculate here.
+    setPlannedRoute(STATIC_ROUTE_POINTS);
+    setError("");
+    setRouteLoading(false);
+    refitMap();
   }
 
   function resetBus() {
@@ -942,8 +856,8 @@ export default function App() {
                 positions={plannedRoute.map((point) => [point.lat, point.lng])}
                 pathOptions={{
                   color: "#1e1b4b",
-                  weight: 11,
-                  opacity: 0.88,
+                  weight: 4,
+                  opacity: 0.5,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -953,8 +867,8 @@ export default function App() {
                 positions={plannedRoute.map((point) => [point.lat, point.lng])}
                 pathOptions={{
                   color: "#4338ca",
-                  weight: 6,
-                  opacity: 0.96,
+                  weight: 2,
+                  opacity: 0.9,
                   lineCap: "round",
                   lineJoin: "round",
                 }}
@@ -967,7 +881,7 @@ export default function App() {
               positions={remainingRoute.map((point) => [point.lat, point.lng])}
               pathOptions={{
                 color: "#22c55e",
-                weight: 8,
+                weight: 3,
                 opacity: 1,
                 lineCap: "round",
                 lineJoin: "round",
@@ -975,8 +889,8 @@ export default function App() {
             />
           )}
 
-          {ROUTE_CHECKPOINTS.map((checkpoint) => (
-            <CheckpointMarker key={checkpoint.id} checkpoint={checkpoint} />
+          {STATIC_ROUTE_WAYPOINTS.map((waypoint) => (
+            <CheckpointMarker key={waypoint.id} waypoint={waypoint} />
           ))}
 
           {userPoint && (
